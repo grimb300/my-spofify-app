@@ -1,0 +1,14 @@
+{
+  "name": "my-spotify-app",
+  "version": "1.0.0",
+  "description": "Simple app to add/modify/delete Spotify playlists",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Bob Grim",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
