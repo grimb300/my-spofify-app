@@ -184,6 +184,8 @@ app.get('/user', (req, res) => {
         console.log('User data successfully returned');
         console.log(body);
 
+        // Save the user data for later and render the user page
+        req.session.user = body;
         res.render('user', { user: body });
       }
     });
