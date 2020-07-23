@@ -183,6 +183,8 @@ app.get('/user', (req, res) => {
       if (!error && response.statusCode === 200) {
         console.log('User data successfully returned');
         console.log(body);
+
+        res.render('user', { user: body });
       }
     });
   }
