@@ -2,6 +2,9 @@ const express = require('express');
 const app = express();
 const port = 8888;
 
+// Get my secret shit out of .env
+require('dotenv').config();
+
 // Requires from Spotify example code
 // request appears to be in the process of being deprecated, consider changing to another package:
 //   https://github.com/request/request/issues/3142
@@ -21,8 +24,8 @@ app.set('view engine', 'ejs');
 
 // Global variables from Spotify example code
 // Replace the client_secret before productizing
-const client_id = '9508e145407c461a9bc632b9a6ac2ee6'; // Your client id
-const client_secret = '637409c4e4f740b3aeeefe4381520b70'; // Your secret
+const client_id = process.env.SPOTIFY_CLIENT_ID; // Your client id
+const client_secret = process.env.SPOTIFY_CLIENT_SECRET; // Your secret
 const redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
 
 // Helper function from Spotify example code
@@ -80,6 +83,9 @@ app.get('/callback', (req, res) => {
     res.redirect('/#' + querystring.stringify({ error: 'state_mismatch' }));
   } else {
     res.clearCookie(stateKey);
+    // The Buffer object creation below throws a warning:
+    // (node:2180) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the
+    // Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
     const authOptions = {
       url: 'https://accounts.spotify.com/api/token',
       form: {
@@ -97,6 +103,9 @@ app.get('/callback', (req, res) => {
 
     request.post(authOptions, (error, response, body) => {
       if (!error && response.statusCode === 200) {
+        console.log('Successful authorization:');
+        console.log(body);
+
         const access_token = body.access_token,
           refresh_token = body.refresh_token;
 
@@ -108,7 +117,7 @@ app.get('/callback', (req, res) => {
 
         // use the access token to access the Spotify Web API
         request.get(options, (error, response, body) => {
-          console.log(body);
+          // console.log(body);
         });
 
         // we can also pass the token to the browser to make requests from there
@@ -124,6 +133,34 @@ app.get('/callback', (req, res) => {
       }
     });
   }
+});
+
+// Refresh Token route, from Spotify example code
+app.get('/refresh_token', function (req, res) {
+  // requesting access token from refresh token
+  var refresh_token = req.query.refresh_token;
+  var authOptions = {
+    url: 'https://accounts.spotify.com/api/token',
+    headers: {
+      Authorization:
+        'Basic ' +
+        new Buffer(client_id + ':' + client_secret).toString('base64')
+    },
+    form: {
+      grant_type: 'refresh_token',
+      refresh_token: refresh_token
+    },
+    json: true
+  };
+
+  request.post(authOptions, function (error, response, body) {
+    if (!error && response.statusCode === 200) {
+      var access_token = body.access_token;
+      res.send({
+        access_token: access_token
+      });
+    }
+  });
 });
 
 app.listen(port, () =>
