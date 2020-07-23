@@ -10,11 +10,15 @@
 <body>
   <h1>My Spotify App</h1>
 
-  <h3><%=user.display_name%>'s Playlists</h3>
+  <h3><%=user.display_name%>'s Tracklist</h3>
   <div class="media-body">
     <ul>
-      <% playlists.forEach((playlist) => { %>
-        <li><a href="/playlists/<%=playlist.id%>"><%=playlist.name%></a></li>
+      <% tracklist.forEach((item) => { %>
+        <li><%=item.track.name%></li>
+        <ul>
+          <li>Album: <%=item.track.album.name%></li>
+          <li>Artists: <%=item.track.artists.map((artist) => artist.name).join(', ')%></li>
+        </ul>
       <% }); %>
       <!-- <dt>Display name</dt><dd class="clearfix"><%=user.display_name%></dd>
       <dt>Id</dt><dd><%=user.id%></dd>

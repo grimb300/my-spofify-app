@@ -219,6 +219,45 @@ app.get('/playlists', (req, res) => {
   }
 });
 
+// Individual playlist route
+app.get('/playlists/:id', (req, res) => {
+  playlistId = req.params.id;
+
+  // Check to see if we have a token
+  if (req.session.access_token) {
+    console.log('tracklist has a valid access_token');
+    // Get the tracklist for this playlist
+    const options = {
+      url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+      headers: { Authorization: 'Bearer ' + req.session.access_token },
+      json: true
+    };
+
+    request.get(options, (error, response, body) => {
+      if (!error && response.statusCode === 200) {
+        console.log('Playlist tracks successfully returned');
+        console.log(body);
+
+        // Render the tracklist
+        res.render('tracklist', {
+          user: req.session.user,
+          tracklist: body.items
+        });
+      } else {
+        if (error) {
+          console.log('tracklist request returned an error');
+        } else {
+          console.log(
+            `tracklist request returned statusCode ${response.statusCode}`
+          );
+        }
+      }
+    });
+  } else {
+    console.log('tracklist does not have a valid access token');
+  }
+});
+
 // Refresh Token route, from Spotify example code
 app.get('/refresh_token', (req, res) => {
   console.log(`Session (/refresh_token):`);
