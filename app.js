@@ -192,6 +192,33 @@ app.get('/user', (req, res) => {
   }
 });
 
+// Playlists route
+app.get('/playlists', (req, res) => {
+  // Check to see if we have a token
+  if (req.session.access_token) {
+    // Get the user playlists
+    const options = {
+      url: 'https://api.spotify.com/v1/me/playlists',
+      headers: { Authorization: 'Bearer ' + req.session.access_token },
+      json: true
+    };
+
+    // use the access token to access the Spotify Web API
+    request.get(options, (error, response, body) => {
+      if (!error && response.statusCode === 200) {
+        console.log('User playlists successfully returned');
+        console.log(body);
+
+        // Save the user data for later and render the user page
+        res.render('playlists', {
+          user: req.session.user,
+          playlists: body.items
+        });
+      }
+    });
+  }
+});
+
 // Refresh Token route, from Spotify example code
 app.get('/refresh_token', (req, res) => {
   console.log(`Session (/refresh_token):`);
