@@ -17,7 +17,7 @@
         <li><%=item.track.name%></li>
         <ul>
           <li>Album: <%=item.track.album.name%></li>
-          <li>Artists: <%=item.track.artists.map((artist) => artist.name).join(', ')%></li>
+          <li>Artist(s): <%=item.track.artists.map((artist) => artist.name).join(', ')%></li>
         </ul>
       <% }); %>
       <!-- <dt>Display name</dt><dd class="clearfix"><%=user.display_name%></dd>

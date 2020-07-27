@@ -5,13 +5,12 @@ const port = 8888;
 // Get my secret shit out of .env
 require('dotenv').config();
 
+// Using axios for my HTTP requests
+const axios = require('axios');
+
 // Requires from Spotify example code
-// request appears to be in the process of being deprecated, consider changing to another package:
-//   https://github.com/request/request/issues/3142
-const request = require('request'); // "Request" library
 const cors = require('cors');
 const querystring = require('querystring');
-// const cookieParser = require('cookie-parser');
 
 const stateKey = 'spotify_auth_state';
 
@@ -25,6 +24,7 @@ app.use(cors());
 
 // Middleware to keep track of each user session, handles cookies for me as well
 const session = require('express-session');
+const { compile } = require('ejs');
 app.use(
   session({
     secret: 'I have a twelve inch cock. His name is Stewey!',
@@ -62,15 +62,16 @@ const generateRandomString = function (length) {
 // Root route
 // app.get('/', (req, res) => res.send('Hello World!'));
 app.get('/', (req, res) => {
-  console.log(`Session (/):`);
-  console.log(req.session);
+  // console.log(`Session (/):`);
+  // console.log(req.session);
   res.render('index');
 });
 
 // Login route, borrowed from the Spotify example code
 app.get('/login', (req, res) => {
-  console.log(`Session (/login):`);
-  console.log(req.session);
+  console.log('/login route');
+  // console.log(`Session (/login):`);
+  // console.log(req.session);
   const state = generateRandomString(16);
   // res.cookie(stateKey, state);
   req.session[stateKey] = state;
@@ -91,104 +92,81 @@ app.get('/login', (req, res) => {
 
 // Callback route, borrowed from the Spotify example code
 app.get('/callback', (req, res) => {
-  console.log(`Session (/callback):`);
-  console.log(req.session);
-  // your application requests refresh and access tokens
-  // after checking the state parameter
+  console.log('/callback route');
+  // Using callback function from: https://github.com/spotify/web-api-auth-examples/issues/55
 
   const code = req.query.code || null;
   const state = req.query.state || null;
-  // const storedState = req.cookies ? req.cookies[stateKey] : null;
   const storedState = req.session[stateKey] ? req.session[stateKey] : null;
 
-  console.log(`/callback: state - ${state}, storedState - ${storedState}`);
-
   if (state === null || state !== storedState) {
-    res.redirect('/#' + querystring.stringify({ error: 'state_mismatch' }));
-  } else {
-    // res.clearCookie(stateKey);
-    req.session[stateKey] = null;
-    // The Buffer object creation below throws a warning:
-    // (node:2180) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the
-    // Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
-    const authOptions = {
-      url: 'https://accounts.spotify.com/api/token',
-      form: {
-        code: code,
-        redirect_uri: redirect_uri,
-        grant_type: 'authorization_code'
-      },
-      headers: {
-        Authorization:
-          'Basic ' +
-          new Buffer(client_id + ':' + client_secret).toString('base64')
-      },
-      json: true
-    };
-
-    request.post(authOptions, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        console.log('Successful authorization:');
-        console.log(body);
-
-        const access_token = body.access_token,
-          refresh_token = body.refresh_token;
-
-        // Add the tokens to the session data
-        req.session.access_token = access_token;
-        req.session.refresh_token = refresh_token;
-
-        // Redirect to the '/user' route
-        res.redirect('/user');
-
-        // const options = {
-        //   url: 'https://api.spotify.com/v1/me',
-        //   headers: { Authorization: 'Bearer ' + access_token },
-        //   json: true
-        // };
-
-        // // use the access token to access the Spotify Web API
-        // request.get(options, (error, response, body) => {
-        //   // console.log(body);
-        // });
-
-        // // we can also pass the token to the browser to make requests from there
-        // res.redirect(
-        //   '/#' +
-        //     querystring.stringify({
-        //       access_token: access_token,
-        //       refresh_token: refresh_token
-        //     })
-        // );
-      } else {
-        res.redirect('/#' + querystring.stringify({ error: 'invalid_token' }));
-      }
-    });
+    // res.redirect(
+    //   '/#' +
+    //     queryString.stringify({
+    //       error: 'state_mismatch'
+    //     })
+    // );
+    res.send(`state (${state}) does not match storedState (${storedState})`);
+    return;
   }
+
+  req.session[stateKey] = null;
+
+  // console.log('Sending POST request to api/token');
+
+  axios({
+    url: 'https://accounts.spotify.com/api/token',
+    method: 'post',
+    params: {
+      code: code,
+      redirect_uri: redirect_uri,
+      grant_type: 'authorization_code'
+    },
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    auth: {
+      username: client_id,
+      password: client_secret
+    }
+  })
+    .then((response) => {
+      // console.log(`Received a valid response (${response.status}) with data:`);
+      // console.log(response.data);
+
+      // Add the tokens to the session data
+      req.session.access_token = response.data.access_token;
+      req.session.refresh_token = response.data.refresh_token;
+
+      res.redirect('/user');
+
+      // console.log('Sending GET request to v1/me');
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 });
 
 // User route
 app.get('/user', (req, res) => {
+  // console.log('/user route');
   // Check to see if we have a token
   if (req.session.access_token) {
     // Get the user data
-    const options = {
-      url: 'https://api.spotify.com/v1/me',
-      headers: { Authorization: 'Bearer ' + req.session.access_token },
-      json: true
-    };
+    (async () => {
+      const userData = await getSpotifyData('https://api.spotify.com/v1/me', {
+        access: req.session.access_token,
+        refresh: req.session.access_token
+      });
 
-    // use the access token to access the Spotify Web API
-    request.get(options, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        console.log('User data successfully returned');
-        console.log(body);
-
-        // Save the user data for later and render the user page
-        req.session.user = body;
-        res.render('user', { user: body });
-      }
-    });
+      // Save the user data and render the user page
+      req.session.user = userData;
+      res.render('user', { user: userData });
+    })();
+  } else {
+    // If no token, got back to the login screen
+    res.redirect('/login');
   }
 });
 
@@ -197,25 +175,21 @@ app.get('/playlists', (req, res) => {
   // Check to see if we have a token
   if (req.session.access_token) {
     // Get the user playlists
-    const options = {
-      url: 'https://api.spotify.com/v1/me/playlists',
-      headers: { Authorization: 'Bearer ' + req.session.access_token },
-      json: true
-    };
+    (async () => {
+      const playlistsData = await getSpotifyData(
+        'https://api.spotify.com/v1/me/playlists',
+        {
+          access: req.session.access_token,
+          refresh: req.session.access_token
+        }
+      );
 
-    // use the access token to access the Spotify Web API
-    request.get(options, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        console.log('User playlists successfully returned');
-        console.log(body);
-
-        // Save the user data for later and render the user page
-        res.render('playlists', {
-          user: req.session.user,
-          playlists: body.items
-        });
-      }
-    });
+      // Render the playlists page
+      res.render('playlists', {
+        user: req.session.user,
+        playlists: playlistsData.items
+      });
+    })();
   }
 });
 
@@ -225,43 +199,29 @@ app.get('/playlists/:id', (req, res) => {
 
   // Check to see if we have a token
   if (req.session.access_token) {
-    console.log('tracklist has a valid access_token');
     // Get the tracklist for this playlist
-    const options = {
-      url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
-      headers: { Authorization: 'Bearer ' + req.session.access_token },
-      json: true
-    };
-
-    request.get(options, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        console.log('Playlist tracks successfully returned');
-        console.log(body);
-
-        // Render the tracklist
-        res.render('tracklist', {
-          user: req.session.user,
-          tracklist: body.items
-        });
-      } else {
-        if (error) {
-          console.log('tracklist request returned an error');
-        } else {
-          console.log(
-            `tracklist request returned statusCode ${response.statusCode}`
-          );
+    (async () => {
+      const tracksData = await getSpotifyData(
+        `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+        {
+          access: req.session.access_token,
+          refresh: req.session.access_token
         }
-      }
-    });
-  } else {
-    console.log('tracklist does not have a valid access token');
+      );
+
+      // Render the tracklist page
+      res.render('tracklist', {
+        user: req.session.user,
+        tracklist: tracksData.items
+      });
+    })();
   }
 });
 
 // Refresh Token route, from Spotify example code
 app.get('/refresh_token', (req, res) => {
-  console.log(`Session (/refresh_token):`);
-  console.log(req.session);
+  // console.log(`Session (/refresh_token):`);
+  // console.log(req.session);
   // requesting access token from refresh token
   var refresh_token = req.query.refresh_token;
   var authOptions = {
@@ -291,3 +251,33 @@ app.get('/refresh_token', (req, res) => {
 app.listen(port, () =>
   console.log(`App listening at httpL//localhost:${port}`)
 );
+
+// -------------------------------------------
+// Utils section, should go in a separate file
+// -------------------------------------------
+
+const getSpotifyData = async (apiEndpoint, tokens) => {
+  try {
+    console.log(`Sending GET request to ${apiEndpoint}`);
+    const resp = await axios({
+      method: 'get',
+      url: apiEndpoint,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${tokens.access}`
+      }
+      // params: {
+      //   access_token: tokens.access,
+      //   refresh_token: tokens.refresh
+      // }
+    });
+    console.log('Full resp object');
+    console.log(resp);
+    // console.log('Got a response');
+    // console.log(resp.data);
+    return resp.data;
+  } catch (err) {
+    console.error(err);
+  }
+};
