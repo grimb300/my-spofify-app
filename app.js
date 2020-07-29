@@ -424,14 +424,53 @@ app.get('/google_playlists/:playlistId/track/:trackId', async (req, res) => {
   const playlistId = req.params.playlistId;
   const trackId = req.params.trackId;
 
-  // Check if the googlePlaylists structure is present and if the playlistId requested is present
+  // Check if the necessary googlePlaylists structures are present
+  if (
+    !req.session.googlePlaylists ||
+    !req.session.googlePlaylists[playlistId]
+  ) {
+    // If no playlist, redirect to google_playlists
+    res.redirect('/google_playlists');
+    return;
+  } else if (!req.session.googlePlaylists[playlistId].Tracks) {
+    // If not tracklist, redirect to google_playlist/<playlistId>
+    res.redirect(`/google_playlists/${playlistId}`);
+    return;
+  } else if (!req.session.access_token) {
+    // If no Spotify access token, redirect to the root
+    res.redirect('/');
+    return;
+  } else {
+    // Get Spotify search results based on the Google track info
+    const googleTrack = req.session.googlePlaylists[playlistId].Tracks[trackId];
+    const searchResults = await getSpotifyData(
+      'https://api.spotify.com/v1/search',
+      {
+        access: req.session.access_token,
+        refresh: req.session.refresh_token
+      },
+      {
+        q: `track:${googleTrack.Title} artist:${googleTrack.Artist} album:${googleTrack.Album}`,
+        type: 'track'
+      }
+    );
+    console.log('Spotify returned search results:');
+    if (searchResults.tracks.total > 0) {
+      console.log(searchResults.tracks.items);
+    } else {
+      console.log('No results');
+    }
 
-  console.log(`Rendering page for track ${trackId} in playlist ${playlistId}`);
-  res.render('google_single_track', {
-    track: null,
-    playlistId: playlistId,
-    trackId: trackId
-  });
+    // Render the page
+    res.render('google_single_track', {
+      track: req.session.googlePlaylists[playlistId].Tracks[trackId],
+      playlistId: playlistId,
+      trackId: trackId,
+      numResults: searchResults.tracks.total,
+      searchResults:
+        searchResults.tracks.total > 0 ? searchResults.tracks.items : {}
+    });
+  }
 });
 
 // Refresh Token route, from Spotify example code
@@ -472,9 +511,10 @@ app.listen(port, () =>
 // Utils section, should go in a separate file
 // -------------------------------------------
 
-const getSpotifyData = async (apiEndpoint, tokens) => {
+const getSpotifyData = async (apiEndpoint, tokens, params) => {
   try {
     console.log(`Sending GET request to ${apiEndpoint}`);
+    const paramsData = params ? params : {};
     const resp = await axios({
       method: 'get',
       url: apiEndpoint,
@@ -482,11 +522,8 @@ const getSpotifyData = async (apiEndpoint, tokens) => {
         Accept: 'application/json',
         'Content-Type': 'application/x-www-form-urlencoded',
         Authorization: `Bearer ${tokens.access}`
-      }
-      // params: {
-      //   access_token: tokens.access,
-      //   refresh_token: tokens.refresh
-      // }
+      },
+      params: paramsData
     });
     // console.log('Full resp object');
     // console.log(resp);

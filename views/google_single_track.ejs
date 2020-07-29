@@ -24,22 +24,43 @@
     .album {
       grid-column: 3;
     }
-    .spotify {
+    .track-no {
       grid-column: 4;
+    }
+    .spotify {
+      grid-column: 5;
     }
   </style>
   <div class="wrapper">
     <div class="title"><strong>Title</strong></div>
     <div class="artist"><strong>Artist</strong></div>
     <div class="album"><strong>Album</strong></div>
-    <div class="spotify"><strong>Spotify Track(s)</strong></div>
     <% if (track) { %>
       <div class="title"><%=track.Title%></div>
       <div class="artist"><%=track.Artist%></div>
       <div class="album"><%=track.Album%></div>
-      <div class="spotify">Spotify?</div>
     <% } else { %>
       <p>Track is empty</p>
+    <% } %>
+  </div>
+
+  <h3>Found <%=numResults%> matching Spotify tracks</h3>
+  <div class="wrapper">
+    <div class="title"><strong>Title</strong></div>
+    <div class="artist"><strong>Artist</strong></div>
+    <div class="album"><strong>Album</strong></div>
+    <div class="album"><strong>Track No</strong></div>
+    <div class="spotify"><strong>Spotify ID</strong></div>
+    <% if (numResults > 0) { %>
+      <% searchResults.forEach((spotifyTrack) => { %>
+        <div class="title"><%=spotifyTrack.name%></div>
+        <div class="artist"><%=spotifyTrack.artists.map((artist) => artist.name).join(', ')%></div>
+        <div class="album"><%=spotifyTrack.album.name%></div>
+        <div class="track-no"><%=spotifyTrack.track_number%></div>
+        <div class="spotify"><%=spotifyTrack.id%></div>
+      <% }) %>
+    <% } else { %>
+      <p>Search results are empty</p>
     <% } %>
   </div>
 
