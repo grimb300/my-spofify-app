@@ -12,6 +12,10 @@ const axios = require('axios');
 const cors = require('cors');
 const querystring = require('querystring');
 
+// Requires for reading and parsing the Google playlist CSVs
+const fs = require('fs');
+const csv = require('csv-parser');
+
 const stateKey = 'spotify_auth_state';
 
 // Middleware from Spotify example code (use cors and cookieParser, don't use static)
@@ -77,7 +81,8 @@ app.get('/login', (req, res) => {
   req.session[stateKey] = state;
 
   // your application requests authorization
-  const scope = 'user-read-private user-read-email';
+  const scope =
+    'user-read-private user-read-email playlist-modify-public playlist-modify-private';
   res.redirect(
     'https://accounts.spotify.com/authorize?' +
       querystring.stringify({
@@ -180,7 +185,7 @@ app.get('/playlists', (req, res) => {
         'https://api.spotify.com/v1/me/playlists',
         {
           access: req.session.access_token,
-          refresh: req.session.access_token
+          refresh: req.session.refresh_token
         }
       );
 
@@ -205,7 +210,7 @@ app.get('/playlists/:id', (req, res) => {
         `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
         {
           access: req.session.access_token,
-          refresh: req.session.access_token
+          refresh: req.session.refresh_token
         }
       );
 
@@ -216,6 +221,217 @@ app.get('/playlists/:id', (req, res) => {
       });
     })();
   }
+});
+
+app.get('/search', (req, res) => {
+  // Check to see if we have a token
+  if (req.session.access_token) {
+    // Get the search results
+    (async () => {
+      const searchResults = await getSpotifyData(
+        'https://api.spotify.com/v1/search?q=boulevard%20of%20broken%20dreams&type=track',
+        {
+          access: req.session.access_token,
+          refresh: req.session.refresh_token
+        }
+      );
+
+      // Render the search results page
+      console.log('Rendering search_results with tracklist');
+      console.log(searchResults.tracks.items);
+      res.render('search_results', {
+        tracklist: searchResults.tracks.items
+      });
+    })();
+  }
+});
+
+app.get('/create_playlist', (req, res) => {
+  // Check to see if we have a token
+  if (req.session.access_token) {
+    // Get the search results
+    (async () => {
+      const searchResults = await postSpotifyData(
+        `https://api.spotify.com/v1/users/${req.session.user.id}/playlists`,
+        {
+          name: 'Created Playlist'
+        },
+        {
+          access: req.session.access_token,
+          refresh: req.session.refresh_token
+        }
+      );
+
+      // Render the search results page
+      console.log('Rendering search_results with tracklist');
+      console.log(searchResults.tracks.items);
+      res.render('search_results', {
+        tracklist: searchResults.tracks.items
+      });
+    })();
+  }
+});
+
+app.get('/google_playlists', async (req, res) => {
+  // If we already have the top level playlist data, no need to import it again
+  if (!req.session.googlePlaylists) {
+    // Read in the playlist.csv file
+    const rawPlaylistsCSV = [];
+    let googlePlaylists = [];
+    fs
+      .createReadStream(`./playlistCSVs/playlists.csv`)
+      .pipe(csv())
+      .on('data', (row) => {
+        rawPlaylistsCSV.push(row);
+      })
+      .on('end', async () => {
+        // Clean up the title and description and add a directory field
+        googlePlaylists = rawPlaylistsCSV.map((playlist) => {
+          // The directory turns apostrophes(' or &#39;) into underscores(_)
+          // and forward slashes(/) into dashes(-)
+          playlist.Directory = playlist.Title
+            .replace(/&#39;/g, '_')
+            .replace(/\//g, '-');
+          // Use fromCharCode to get the actual character
+          playlist.Title = playlist.Title.replace(/&#([0-9]+);/g, (match, p1) =>
+            String.fromCharCode(p1)
+          );
+          playlist.Description = playlist.Description.replace(
+            /&#([0-9]+);/g,
+            (match, p1) => String.fromCharCode(p1)
+          );
+          return playlist;
+        });
+
+        // Read in the contents of the playlistCSVs
+        const dirContents = await fs.promises.readdir('./playlistCSVs', {
+          encoding: 'utf8',
+          withFileTypes: true
+        });
+        // Iterate over the directory contents,
+        // filtering out anything that isn't a directory and
+        // adding missing directories to the googlePlaylists structure
+        dirContents.forEach((element) => {
+          if (element.isDirectory()) {
+            const directoryName = element.name;
+            const matchingPlaylist = googlePlaylists.find((playlist) => {
+              return playlist.Directory === directoryName;
+            });
+            if (matchingPlaylist === undefined) {
+              console.log(
+                `Adding ${directoryName} to the googlePlaylists array`
+              );
+              googlePlaylists.push({
+                Title: directoryName,
+                Owner: 'Bob Grim',
+                Description: '',
+                Shared: '',
+                Deleted: '',
+                Directory: directoryName
+              });
+            }
+          }
+        });
+
+        // Add the playlists structure to the session data
+        req.session.googlePlaylists = googlePlaylists;
+        // TODO: Fix async problems which force rendering down each path
+        res.render('google_playlists', { playlists: googlePlaylists });
+      });
+  } else {
+    console.log('Already imported playlists');
+    // TODO: Fix async problems which force rendering down each path
+    res.render('google_playlists', { playlists: req.session.googlePlaylists });
+  }
+});
+
+app.get('/google_playlists/:id', async (req, res) => {
+  const playlistId = req.params.id;
+
+  // Check if the googlePlaylists structure is present and if the playlistId requested is present
+  if (
+    !req.session.googlePlaylists ||
+    !req.session.googlePlaylists[playlistId]
+  ) {
+    // If not, redirect back to the google_playlists route
+    res.redirect('/google_playlists');
+    return;
+  } else if (!req.session.googlePlaylists[playlistId].Tracks) {
+    console.log(`Playlist ID ${playlistId} needs to load the tracklist`);
+
+    // Read in the tracks.csv file for this playlist
+    const rawTracksCSV = [];
+    let googleTracks = [];
+    const playlistDirectory = req.session.googlePlaylists[playlistId].Directory;
+    const RegEx = /&#([0-9]+);|&([a-z]+);/g;
+    const cleanupString = (match, p1, p2, offset, string) => {
+      // Clean up any unicode
+      if (p1) {
+        return String.fromCharCode(p1);
+      } else if (p2 === 'amp') {
+        return '&';
+      } else if (p2 === 'quot') {
+        return '"';
+      } else {
+        console.log(`Don't know how to clean up ${match}`);
+      }
+    };
+
+    fs
+      .createReadStream(`./playlistCSVs/${playlistDirectory}/tracks.csv`)
+      .pipe(csv())
+      .on('data', (row) => {
+        rawTracksCSV.push(row);
+      })
+      .on('end', async () => {
+        googleTracks = rawTracksCSV
+          // Filter out the tracks marked as Removed
+          .filter((track) => track.Removed !== 'Yes')
+          // Clean up the Title, Album, and Artist fields
+          .map((track) => {
+            track.Title = track.Title.replace(RegEx, cleanupString);
+            track.Album = track.Album.replace(RegEx, cleanupString);
+            track.Artist = track.Artist.replace(RegEx, cleanupString);
+            return track;
+          });
+
+        // Sort based on 'Playlist Index'
+        googleTracks.sort((a, b) => {
+          indexA = parseInt(a['Playlist Index']);
+          indexB = parseInt(b['Playlist Index']);
+          return indexA - indexB;
+        });
+
+        // Add the tracklist to the playlist in the session data
+        req.session.googlePlaylists[playlistId].Tracks = googleTracks;
+
+        // TODO: Fix async problems which force rendering down each path
+        res.render('google_tracklist', {
+          playlist: req.session.googlePlaylists[playlistId],
+          playlistId: playlistId
+        });
+      });
+  } else {
+    // TODO: Fix async problems which force rendering down each path
+    res.render('google_tracklist', {
+      playlist: req.session.googlePlaylists[playlistId],
+      playlistId: playlistId
+    });
+  }
+});
+
+app.get('/google_playlists/:playlistId/track/:trackId', async (req, res) => {
+  const playlistId = req.params.playlistId;
+  const trackId = req.params.trackId;
+
+  // Check if the googlePlaylists structure is present and if the playlistId requested is present
+
+  console.log(`Rendering page for track ${trackId} in playlist ${playlistId}`);
+  res.render('google_single_track', {
+    track: null,
+    playlistId: playlistId,
+    trackId: trackId
+  });
 });
 
 // Refresh Token route, from Spotify example code
@@ -272,10 +488,33 @@ const getSpotifyData = async (apiEndpoint, tokens) => {
       //   refresh_token: tokens.refresh
       // }
     });
-    console.log('Full resp object');
-    console.log(resp);
+    // console.log('Full resp object');
+    // console.log(resp);
     // console.log('Got a response');
     // console.log(resp.data);
+    return resp.data;
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const postSpotifyData = async (apiEndpoint, bodyData, tokens) => {
+  try {
+    console.log(`Sending PUT request to ${apiEndpoint}`);
+    const resp = await axios({
+      method: 'post',
+      url: apiEndpoint,
+      data: bodyData,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${tokens.access}`
+      }
+    });
+    // console.log('Full resp object');
+    // console.log(resp);
+    console.log('Got a response');
+    console.log(resp.data);
     return resp.data;
   } catch (err) {
     console.error(err);

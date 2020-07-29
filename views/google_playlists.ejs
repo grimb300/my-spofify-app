@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  <title>My Spotify App</title>
+</head>
+<body>
+  <h1>My Spotify App</h1>
+
+  <h3>Analyze CSVs</h3>
+  <div class="media-body">
+    <ul>
+      <% playlists.forEach((playlist, index) => { %>
+        <li><a href="/google_playlists/<%=index%>"><%=playlist.Title%></a></li>
+        <% if (playlist.Description !== '') { %>
+          <ul>
+            <li><%=playlist.Description%></li>
+          </ul>
+        <% } %>
+      <% }) %>
+    </ul>
+  </div>
+
+  <!-- Latest compiled and minified JavaScript -->
+  <!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script> -->
+</body>
+</html>
