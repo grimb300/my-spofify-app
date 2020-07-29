@@ -1,3 +1,10 @@
+# My stuff
+
+# Don't save any of my personal track info
+playlistCSVs/
+
+# End My stuff
+
 # Logs
 logs
 *.log
