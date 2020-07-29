@@ -16,27 +16,32 @@
     .wrapper {
       display: grid;
     }
-    .title {
+    .track {
       grid-column: 1;
     }
-    .artist {
+    .title {
       grid-column: 2;
     }
-    .album {
+    .artist {
       grid-column: 3;
     }
-    .spotify {
+    .album {
       grid-column: 4;
+    }
+    .spotify {
+      grid-column: 5;
     }
   </style>
   <div class="wrapper">
+    <div class="track"><strong>Track No</strong></div>
     <div class="title"><strong>Title</strong></div>
     <div class="artist"><strong>Artist</strong></div>
     <div class="album"><strong>Album</strong></div>
     <div class="spotify"><strong>Spotify Track(s)</strong></div>
     <% if (playlist.Tracks) { %>
-      <% playlist.Tracks.forEach((track) => { %>
-        <div class="title"><a href="/google_playlists/<%=playlistId%>/track/<%=track['Playlist Index']%>"><%=track.Title%></a></div>
+      <% playlist.Tracks.forEach((track, index) => { %>
+        <div class="track"><%=index + 1%></div>
+        <div class="title"><a href="/google_playlists/<%=playlistId%>/track/<%=index%>"><%=track.Title%></a></div>
         <div class="artist"><%=track.Artist%></div>
         <div class="album"><%=track.Album%></div>
         <div class="spotify">Spotify?</div>
