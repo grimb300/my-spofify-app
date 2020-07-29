@@ -441,8 +441,27 @@ app.get('/google_playlists/:playlistId/track/:trackId', async (req, res) => {
     res.redirect('/');
     return;
   } else {
+    // Clean up the track/artist/album info to search in Spotify
+    // Removing all parenthetical phrases as they tend to be
+    // featured artists and other info that makes it hard to search
+    const removeParentheticalRegEx = /\(.*\)/g;
+    const origGoogleTrack =
+      req.session.googlePlaylists[playlistId].Tracks[trackId];
+    const cleanGoogleTrack = {};
+    cleanGoogleTrack.Title = origGoogleTrack.Title.replace(
+      removeParentheticalRegEx,
+      ''
+    );
+    cleanGoogleTrack.Artist = origGoogleTrack.Artist.replace(
+      removeParentheticalRegEx,
+      ''
+    );
+    cleanGoogleTrack.Album = origGoogleTrack.Album.replace(
+      removeParentheticalRegEx,
+      ''
+    );
+
     // Get Spotify search results based on the Google track info
-    const googleTrack = req.session.googlePlaylists[playlistId].Tracks[trackId];
     const searchResults = await getSpotifyData(
       'https://api.spotify.com/v1/search',
       {
@@ -450,7 +469,7 @@ app.get('/google_playlists/:playlistId/track/:trackId', async (req, res) => {
         refresh: req.session.refresh_token
       },
       {
-        q: `track:${googleTrack.Title} artist:${googleTrack.Artist} album:${googleTrack.Album}`,
+        q: `track:${cleanGoogleTrack.Title} artist:${cleanGoogleTrack.Artist} album:${cleanGoogleTrack.Album}`,
         type: 'track'
       }
     );
