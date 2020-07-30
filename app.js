@@ -144,27 +144,16 @@ app.get('/', async (req, res) => {
           withFileTypes: true
         });
         const newPlaylists = dirContents
-          .filter((file) => {
-            // Filter out files that aren't directories
-            if (!file.isDirectory()) {
-              // console.log(`${file.name} isn't a directory`);
-              return false;
-            }
-
-            // Check if this directory is already in googlePlaylists
-            const matchingDir = req.session.googlePlaylists.find((playlist) => {
-              return playlist.directory === file.name;
-            });
-            if (matchingDir === undefined) {
-              // console.log(`${file.name} not found in googlePlaylists`);
-            }
-            return matchingDir === undefined;
-          })
+          // Filter to get only directories that aren't already in googlePlaylists
+          .filter(
+            (file) =>
+              file.isDirectory() &&
+              req.session.googlePlaylists.find(
+                (playlist) => playlist.directory === file.name
+              ) === undefined
+          )
           // Return only the name of the directory
-          // .map((playlistDir) => playlistDir.name);
-          .map((playlistDir) => {
-            return playlistDir.name;
-          });
+          .map((playlistDir) => playlistDir.name);
 
         newPlaylists.forEach((newPlaylist) => {
           req.session.googlePlaylists.push({
@@ -173,6 +162,8 @@ app.get('/', async (req, res) => {
             directory: newPlaylist
           });
         });
+
+        // Now load in each individual <playlist>/tracks.csv
 
         console.log(`done with reading playlists.csv`);
         console.log(req.session);
