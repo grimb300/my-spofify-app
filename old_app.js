@@ -64,164 +64,20 @@ const generateRandomString = function (length) {
 };
 
 // Root route
-app.get('/', async (req, res) => {
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // Redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
-
-  // Check for Google playlists
-  if (!req.session.googlePlaylists) {
-    // Create an empty array for the playlist
-    req.session.googlePlaylists = [];
-
-    // Clean up HTML special entities
-    const cleanHtmlRegEx = /&(#([0-9]+)|([a-z]+));/g;
-    const cleanHtmlFunc = (match, p1, p2, p3) => {
-      // console.log(
-      //   `Saw regex match (${match}) with p1 (${p1}), p2 (${p2}), p3(${p3})`
-      // );
-      // It is a decimal unicode value if p2 is defined
-      if (p2) {
-        return String.fromCharCode(p2);
-      }
-      // console.log(`ERROR: Don't know how to clean up ${match}`);
-      return match;
-    };
-
-    // Read in the playlists.csv file
-    const playlistsDir = './playlistCSVs';
-    const playlistsCsvFile = `${playlistsDir}/playlists.csv`;
-    fs
-      .createReadStream(playlistsCsvFile)
-      .pipe(csv())
-      .on('data', (playlist) => {
-        // Only do something if this playlist isn't deleted (shouldn't happen)
-        if (playlist.Deleted !== 'Yes') {
-          // Clean up the Title and Description text
-          const title = playlist.Title.replace(cleanHtmlRegEx, cleanHtmlFunc);
-          if (title !== playlist.Title) {
-            // console.log(
-            //   `HTML cleanup turned (${playlist.Title}) into (${title})`
-            // );
-          }
-          const description = playlist.Description.replace(
-            cleanHtmlRegEx,
-            cleanHtmlFunc
-          );
-          if (description !== playlist.Description) {
-            // console.log(
-            //   `HTML cleanup turned (${playlist.Description}) into (${description})`
-            // );
-          }
-
-          // Clean up the Directory text
-          // The directory is the same as the title except for...
-          //    ... apostrophes(') turn into underscores(_)
-          //    ... slashes(/) turn into dashes(-)
-          const directory = title.replace(/'/g, '_').replace(/\//g, '-');
-          if (directory !== title) {
-            // console.log(
-            //   `Directory cleanup turned (${title}) into (${directory})`
-            // );
-          }
-
-          // Add this playlist to googlePlaylists
-          req.session.googlePlaylists.push({
-            title: title,
-            description: description,
-            directory: directory
-          });
-        }
-        // console.log(playlist);
-      })
-      .on('end', async () => {
-        // Get the contents of the playlistsDir
-        const dirContents = await fs.promises.readdir(playlistsDir, {
-          encoding: 'utf8',
-          withFileTypes: true
-        });
-        const newPlaylists = dirContents
-          .filter((file) => {
-            // Filter out files that aren't directories
-            if (!file.isDirectory()) {
-              // console.log(`${file.name} isn't a directory`);
-              return false;
-            }
-
-            // Check if this directory is already in googlePlaylists
-            const matchingDir = req.session.googlePlaylists.find((playlist) => {
-              return playlist.directory === file.name;
-            });
-            if (matchingDir === undefined) {
-              // console.log(`${file.name} not found in googlePlaylists`);
-            }
-            return matchingDir === undefined;
-          })
-          // Return only the name of the directory
-          // .map((playlistDir) => playlistDir.name);
-          .map((playlistDir) => {
-            return playlistDir.name;
-          });
-
-        newPlaylists.forEach((newPlaylist) => {
-          req.session.googlePlaylists.push({
-            title: newPlaylist,
-            description: '',
-            directory: newPlaylist
-          });
-        });
-
-        console.log(`done with reading playlists.csv`);
-        console.log(req.session);
-
-        // Doing this in both branches due to the async/await behavior
-        // TODO: Figure out how to fix this the right way
-
-        // Get the Spotify playlists
-        const spotifyPlaylists = [];
-        // const spotifyPlaylists = await getSpotifyData(
-        //   'https//api.spotify.com/v1/me/playlists',
-        //   req.session.tokens
-        // );
-        // console.log('Spotify playlist data:');
-        // console.log(spotifyPlaylists);
-
-        // res.render('index');
-        res.render('user', {
-          user: req.session.user,
-          googlePlaylists: req.session.googlePlaylists,
-          spotifyPlaylists: spotifyPlaylists
-        });
-      });
-  } else {
-    // Doing this in both branches due to the async/await behavior
-    // TODO: Figure out how to fix this the right way
-
-    // Get the Spotify playlists
-    const spotifyPlaylists = [];
-    // const spotifyPlaylists = await getSpotifyData(
-    //   'https//api.spotify.com/v1/me/playlists',
-    //   req.session.tokens
-    // );
-    // console.log('Spotify playlist data:');
-    // console.log(spotifyPlaylists);
-
-    // res.render('index');
-    res.render('user', {
-      user: req.session.user,
-      googlePlaylists: req.session.googlePlaylists,
-      spotifyPlaylists: spotifyPlaylists
-    });
-  }
+// app.get('/', (req, res) => res.send('Hello World!'));
+app.get('/', (req, res) => {
+  // console.log(`Session (/):`);
+  // console.log(req.session);
+  res.render('index');
 });
 
 // Login route, borrowed from the Spotify example code
 app.get('/login', (req, res) => {
   console.log('/login route');
+  // console.log(`Session (/login):`);
+  // console.log(req.session);
   const state = generateRandomString(16);
+  // res.cookie(stateKey, state);
   req.session[stateKey] = state;
 
   // your application requests authorization
@@ -280,25 +136,17 @@ app.get('/callback', (req, res) => {
       password: client_secret
     }
   })
-    .then(async (response) => {
+    .then((response) => {
       // console.log(`Received a valid response (${response.status}) with data:`);
       // console.log(response.data);
 
       // Add the tokens to the session data
-      req.session.tokens = {
-        access: response.data.access_token,
-        refresh: response.data.refresh_token
-      };
+      req.session.access_token = response.data.access_token;
+      req.session.refresh_token = response.data.refresh_token;
 
-      // Get the user data
-      const userData = await getSpotifyData(
-        'https://api.spotify.com/v1/me',
-        req.session.tokens
-      );
-      req.session.user = userData;
+      res.redirect('/user');
 
-      // Redirect to the root
-      res.redirect('/');
+      // console.log('Sending GET request to v1/me');
     })
     .catch((err) => {
       console.log(err);
