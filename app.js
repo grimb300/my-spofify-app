@@ -82,9 +82,6 @@ app.get('/', async (req, res) => {
     // Clean up HTML special entities
     const cleanHtmlRegEx = /&(#([0-9]+)|([a-z]+));/g;
     const cleanHtmlFunc = (match, p1, p2, p3) => {
-      // console.log(
-      //   `Saw regex match (${match}) with p1 (${p1}), p2 (${p2}), p3(${p3})`
-      // );
       // It is a decimal unicode value if p2 is defined
       if (p2) {
         return String.fromCharCode(p2);
@@ -107,9 +104,10 @@ app.get('/', async (req, res) => {
     // Trying a new method
 
     // Read in the playlists CSV
-    const fileHandle = await fsPromises.open(playlistsCsvFile);
-    const fileData = await fileHandle.readFile('utf8');
-    const googlePlaylists = parse(fileData, {
+    const playlistsFileHandle = await fsPromises.open(playlistsCsvFile);
+    const playlistsData = await playlistsFileHandle.readFile('utf8');
+    await playlistsFileHandle.close();
+    let googlePlaylists = parse(playlistsData, {
       columns: true,
       on_record: (playlist) => {
         // If deleted, return null
@@ -124,7 +122,7 @@ app.get('/', async (req, res) => {
           cleanHtmlFunc
         );
 
-        // The directory is a further clean up of the title
+        // The directory further cleans up of the title
         //    - apostrophes(') turn into underscores(_)
         //    - slashes(/) turn into dashes(-)
         const directory = title.replace(/'/g, '_').replace(/\//g, '-');
@@ -140,7 +138,6 @@ app.get('/', async (req, res) => {
       },
       skip_empty_lines: true
     });
-    fileHandle.close();
 
     // Add in any extra directories not in the the CSV
     const dirContents = await fsPromises.readdir(playlistsDir, {
@@ -165,168 +162,52 @@ app.get('/', async (req, res) => {
           tracks: []
         })
       );
+
+    // Add the track list to each playlist
+    // Has to be wrapped in an await Promise.all() because the mapping function is async
+    googlePlaylists = await Promise.all(
+      googlePlaylists.map(async (playlist) => {
+        // Read in the tracks CSV
+        const tracksCsvFile = `${playlistsDir}/${playlist.directory}/tracks.csv`;
+        const tracksFileHandle = await fsPromises.open(tracksCsvFile);
+        const tracksData = await tracksFileHandle.readFile('utf8');
+        await tracksFileHandle.close();
+        const googleTracks = parse(tracksData, {
+          columns: true,
+          on_record: (track) => {
+            // If deleted, return null
+            if (track.Removed === 'Yes') {
+              return null;
+            }
+
+            // Return the modified record
+            return {
+              // Clean up the Title, Album and Artist text
+              title: track.Title.replace(cleanHtmlRegEx, cleanHtmlFunc),
+              album: track.Album.replace(cleanHtmlRegEx, cleanHtmlFunc),
+              artist: track.Artist.replace(cleanHtmlRegEx, cleanHtmlFunc),
+              // Convert the playlist index from string to int
+              playlistIndex: parseInt(track['Playlist Index'])
+            };
+          },
+          skip_empty_lines: true
+        }).sort((a, b) => a.playlistIndex - b.playlistIndex);
+
+        // Return the playlist with track list
+        playlist.tracks = googleTracks;
+        return playlist;
+      })
+    );
+
+    // console.log('After Promise.all');
+    // console.log('All done parsing playlists and tracks');
+    // console.log(googlePlaylists);
+
+    // console.log(googlePlaylists[0].tracks);
+
     req.session.googlePlaylists = googlePlaylists;
-    console.log(googlePlaylists);
-
-    // // Old method
-    // fs
-    //   .createReadStream(playlistsCsvFile)
-    //   .pipe(csv())
-    //   .on('data', (playlist) => {
-    //     // Only do something if this playlist isn't deleted (shouldn't happen)
-    //     if (playlist.Deleted !== 'Yes') {
-    //       // Clean up the Title and Description text
-    //       const title = playlist.Title.replace(cleanHtmlRegEx, cleanHtmlFunc);
-    //       if (title !== playlist.Title) {
-    //         // console.log(
-    //         //   `HTML cleanup turned (${playlist.Title}) into (${title})`
-    //         // );
-    //       }
-    //       const description = playlist.Description.replace(
-    //         cleanHtmlRegEx,
-    //         cleanHtmlFunc
-    //       );
-    //       if (description !== playlist.Description) {
-    //         // console.log(
-    //         //   `HTML cleanup turned (${playlist.Description}) into (${description})`
-    //         // );
-    //       }
-
-    //       // Clean up the Directory text
-    //       // The directory is the same as the title except for...
-    //       //    ... apostrophes(') turn into underscores(_)
-    //       //    ... slashes(/) turn into dashes(-)
-    //       const directory = title.replace(/'/g, '_').replace(/\//g, '-');
-    //       if (directory !== title) {
-    //         // console.log(
-    //         //   `Directory cleanup turned (${title}) into (${directory})`
-    //         // );
-    //       }
-
-    //       // Add this playlist to googlePlaylists
-    //       req.session.googlePlaylists.push({
-    //         title: title,
-    //         description: description,
-    //         directory: directory
-    //       });
-    //     }
-    //     // console.log(playlist);
-    //   })
-    //   .on('end', async () => {
-    //     // Get the contents of the playlistsDir
-    //     const dirContents = await fs.promises.readdir(playlistsDir, {
-    //       encoding: 'utf8',
-    //       withFileTypes: true
-    //     });
-    //     const newPlaylists = dirContents
-    //       // Filter to get only directories that aren't already in googlePlaylists
-    //       .filter(
-    //         (file) =>
-    //           file.isDirectory() &&
-    //           req.session.googlePlaylists.find(
-    //             (playlist) => playlist.directory === file.name
-    //           ) === undefined
-    //       )
-    //       // Return only the name of the directory
-    //       .map((playlistDir) => playlistDir.name);
-
-    //     newPlaylists.forEach((newPlaylist) => {
-    //       req.session.googlePlaylists.push({
-    //         title: newPlaylist,
-    //         description: '',
-    //         directory: newPlaylist
-    //       });
-    //     });
-
-    //     // Now load in each individual <playlist>/tracks.csv and
-    //     // add the tracks to the playlist entry
-    //     req.session.googlePlaylists = req.session.googlePlaylists.map(
-    //       (playlist) => {
-    //         const tracksCsvFile = `${playlistsDir}/${playlist.directory}/tracks.csv`;
-    //         const playlistTracks = [];
-    //         fs
-    //           .createReadStream(tracksCsvFile)
-    //           .pipe(csv())
-    //           .on('data', (track) => {
-    //             // Only do something if this track isn't deleted
-    //             if (track.Deleted !== 'Yes') {
-    //               // Clean up the Title, Artist and Album fields
-    //               const trackTitle = track.Title.replace(
-    //                 cleanHtmlRegEx,
-    //                 cleanHtmlFunc
-    //               );
-    //               const trackArtist = track.Artist.replace(
-    //                 cleanHtmlRegEx,
-    //                 cleanHtmlFunc
-    //               );
-    //               const trackAlbum = track.Album.replace(
-    //                 cleanHtmlRegEx,
-    //                 cleanHtmlFunc
-    //               );
-
-    //               // Push on to the playlistTracks list
-    //               playlistTracks.push({
-    //                 title: trackTitle,
-    //                 artist: trackArtist,
-    //                 album: trackAlbum,
-    //                 playlistIndex: track['Playlist Index']
-    //               });
-    //             }
-    //           })
-    //           .on('end', () => {
-    //             // Sort on playlistIndex
-    //             playlistTracks.sort(
-    //               (a, b) =>
-    //                 parseInt(a.playlistIndex) - parseInt(b.playlistIndex)
-    //             );
-    //           });
-
-    //         // Add the track list to the playlist and return
-    //         playlist.tracks = playlistTracks;
-    //         return playlist;
-    //       }
-    //     );
-
-    //     // console.log(`done with reading playlists.csv`);
-    //     // console.log(req.session);
-
-    //     // Doing this in both branches due to the async/await behavior
-    //     // TODO: Figure out how to fix this the right way
-
-    //     // Get the Spotify playlists
-    //     const spotifyPlaylists = [];
-    //     // const spotifyPlaylists = await getSpotifyData(
-    //     //   'https//api.spotify.com/v1/me/playlists',
-    //     //   req.session.tokens
-    //     // );
-    //     // console.log('Spotify playlist data:');
-    //     // console.log(spotifyPlaylists);
-
-    //     // res.render('index');
-    //     res.render('user', {
-    //       user: req.session.user,
-    //       googlePlaylists: req.session.googlePlaylists,
-    //       spotifyPlaylists: spotifyPlaylists
-    //     });
-    //   });
   } else {
     console.log('googlePlaylists already defined');
-    // Doing this in both branches due to the async/await behavior
-    // TODO: Figure out how to fix this the right way
-    // Get the Spotify playlists
-    // const spotifyPlaylists = [];
-    // // const spotifyPlaylists = await getSpotifyData(
-    // //   'https//api.spotify.com/v1/me/playlists',
-    // //   req.session.tokens
-    // // );
-    // // console.log('Spotify playlist data:');
-    // // console.log(spotifyPlaylists);
-    // // res.render('index');
-    // res.render('user', {
-    //   user: req.session.user,
-    //   googlePlaylists: req.session.googlePlaylists,
-    //   spotifyPlaylists: spotifyPlaylists
-    // });
   }
   const spotifyPlaylists = [];
   // const spotifyPlaylists = await getSpotifyData(
