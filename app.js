@@ -86,8 +86,15 @@ app.get('/', async (req, res) => {
       // It is a decimal unicode value if p2 is defined
       if (p2) {
         return String.fromCharCode(p2);
+      } else if (p3) {
+        // HTML 4 special entities
+        if (p3 === 'amp') {
+          return '&';
+        } else if (p3 === 'quot') {
+          return '"';
+        }
       }
-      // console.log(`ERROR: Don't know how to clean up ${match}`);
+      console.log(`ERROR: Don't know how to clean up ${match}`);
       return match;
     };
 
@@ -163,7 +170,54 @@ app.get('/', async (req, res) => {
           });
         });
 
-        // Now load in each individual <playlist>/tracks.csv
+        // Now load in each individual <playlist>/tracks.csv and
+        // add the tracks to the playlist entry
+        req.session.googlePlaylists = req.session.googlePlaylists.map(
+          (playlist) => {
+            const tracksCsvFile = `${playlistsDir}/${playlist.directory}/tracks.csv`;
+            const playlistTracks = [];
+            fs
+              .createReadStream(tracksCsvFile)
+              .pipe(csv())
+              .on('data', (track) => {
+                // Only do something if this track isn't deleted
+                if (track.Deleted !== 'Yes') {
+                  // Clean up the Title, Artist and Album fields
+                  const trackTitle = track.Title.replace(
+                    cleanHtmlRegEx,
+                    cleanHtmlFunc
+                  );
+                  const trackArtist = track.Artist.replace(
+                    cleanHtmlRegEx,
+                    cleanHtmlFunc
+                  );
+                  const trackAlbum = track.Album.replace(
+                    cleanHtmlRegEx,
+                    cleanHtmlFunc
+                  );
+
+                  // Push on to the playlistTracks list
+                  playlistTracks.push({
+                    title: trackTitle,
+                    artist: trackArtist,
+                    album: trackAlbum,
+                    playlistIndex: track['Playlist Index']
+                  });
+                }
+              })
+              .on('end', () => {
+                // Sort on playlistIndex
+                playlistTracks.sort(
+                  (a, b) =>
+                    parseInt(a.playlistIndex) - parseInt(b.playlistIndex)
+                );
+              });
+
+            // Add the track list to the playlist and return
+            playlist.tracks = playlistTracks;
+            return playlist;
+          }
+        );
 
         console.log(`done with reading playlists.csv`);
         console.log(req.session);
