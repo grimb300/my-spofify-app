@@ -8,18 +8,27 @@
   <title>My Spotify App</title>
 </head>
 <body>
+  <% const playlist = playlists[playlistId]; %>
   <h1>My Spotify App</h1>
 
-  <h3>Tracklist for <%=playlist.Title%></h3>
-  <p><%=playlist.Description%></p>
+  <h3>Tracklist for <%=playlist.title%></h3>
+  <p><%=playlist.description%></p>
   <style>
     .wrapper {
       display: grid;
+      grid-template-columns: 1fr 4fr 4fr;
+      gap: 10px;
     }
-    .track {
+    .track-number {
       grid-column: 1;
+      text-align: center;
+      align-self: center;
     }
-    .title {
+    .google-track {
+      grid-column: 2;
+      align-self: center;
+    }
+    /* .title {
       grid-column: 2;
     }
     .artist {
@@ -27,24 +36,52 @@
     }
     .album {
       grid-column: 4;
+    } */
+    .spotify-tracks {
+      grid-column: 3;
+      align-self: center;
+
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: inherit;
     }
-    .spotify {
-      grid-column: 5;
+    /* .track-info, .track-number { */
+    .track-info {
+      background-color: lightblue;
+      border-radius: 10px;
+      padding: 10px;
     }
   </style>
   <div class="wrapper">
-    <div class="track"><strong>Track No</strong></div>
-    <div class="title"><strong>Title</strong></div>
-    <div class="artist"><strong>Artist</strong></div>
-    <div class="album"><strong>Album</strong></div>
-    <div class="spotify"><strong>Spotify Track(s)</strong></div>
-    <% if (playlist.Tracks) { %>
-      <% playlist.Tracks.forEach((track, index) => { %>
-        <div class="track"><%=index + 1%></div>
-        <div class="title"><a href="/google_playlists/<%=playlistId%>/track/<%=index%>"><%=track.Title%></a></div>
-        <div class="artist"><%=track.Artist%></div>
-        <div class="album"><%=track.Album%></div>
-        <div class="spotify">Spotify?</div>
+    <div class="track-number"><strong>Track No</strong></div>
+    <div class="google-track">
+      <strong>Google Track</strong>
+      <!-- <div class="title"><strong>Title</strong></div>
+      <div class="artist"><strong>Artist</strong></div>
+      <div class="album"><strong>Album</strong></div> -->
+    </div>
+    <div class="spotify-tracks"><strong>Spotify Track(s)</strong></div>
+    <% if (playlist.tracks) { %>
+      <% playlist.tracks.forEach((track, index) => { %>
+        <div class="track-number"><%=index + 1%></div>
+        <div class="google-track track-info">
+          <div class="title"><a href="/google_playlists/<%=playlistId%>/track/<%=index%>"><%=track.title%></a></div>
+          <div class="artist"><%=track.artist%></div>
+          <div class="album"><%=track.album%></div>
+        </div>
+        <div class="spotify-tracks">
+          <% if (track.spotifyTracks) { %>
+            <% track.spotifyTracks.forEach((spotifyTrack) => { %>
+              <div class="track-info">
+                <div class="title"><%=spotifyTrack.name%></div>
+                <div class="artist"><%=spotifyTrack.artists.map((artist) => artist.name).join(', ')%></div>
+                <div class="title"><%=spotifyTrack.album.name%></div>
+              </div>
+            <% }); %>
+          <% } else { %>
+            <div class="track-info">Spotify?</div>
+          <% } %>
+        </div>
       <% }) %>
     <% } else { %>
       <p>Playlist is empty</p>
