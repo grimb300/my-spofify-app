@@ -535,30 +535,74 @@ app.get('/google_playlists/:id', async (req, res) => {
       // Removing all parenthetical phrases as they tend to be
       // featured artists and other info that makes it hard to search
       const removeParentheticalRegEx = /\(.*\)/g;
+      // const removePunctuationRegEx = /[().!?;:,'"]/g;
+      const removePunctuationRegEx = /[']/g;
       const cleanGoogleTrack = {
-        title: track.title.replace(removeParentheticalRegEx, ''),
-        artist: track.artist.replace(removeParentheticalRegEx, ''),
-        album: track.album.replace(removeParentheticalRegEx, '')
+        title: track.title
+          .replace(removeParentheticalRegEx, '')
+          .replace(removePunctuationRegEx, ''),
+        artist: track.artist
+          .replace(removeParentheticalRegEx, '')
+          .replace(removePunctuationRegEx, ''),
+        album: track.album
+          .replace(removeParentheticalRegEx, '')
+          .replace(removePunctuationRegEx, '')
+        // title: track.title.replace(removeParentheticalRegEx, ''),
+        // artist: track.artist.replace(removeParentheticalRegEx, ''),
+        // album: track.album.replace(removeParentheticalRegEx, '')
       };
 
       // Get Spotify search results based on the Google track info
+      const searchString =
+        `track:${cleanGoogleTrack.title} ` +
+        `artist:${cleanGoogleTrack.artist} ` +
+        `album:${cleanGoogleTrack.album}`;
       const searchResults = await getSpotifyData(
         'https://api.spotify.com/v1/search',
         req.session.tokens,
         {
-          q: `track:${cleanGoogleTrack.title} artist:${cleanGoogleTrack.artist} album:${cleanGoogleTrack.album}`,
+          q: searchString,
           type: 'track'
         }
       );
       // console.log('Spotify tracks');
       // console.log(searchResults.tracks.items);
+
+      // Check how many results are returned
+      if (searchResults.tracks.items.length === 0) {
+        // If there are no results, just notify for now
+        console.log(`No search results for: ${searchString}`);
+      } else if (searchResults.tracks.items.length === 1) {
+        // If there is only one result it has to be the chosen one
+        searchResults.tracks.items[0].chosen = true;
+      } else {
+        console.log(
+          `There are ${searchResults.tracks.items
+            .length} matching spotify tracks`
+        );
+        // There are multiple results, choose the best fit
+        let bestIndex = searchResults.tracks.items.find(
+          (track) =>
+            track.name === cleanGoogleTrack.title &&
+            track.artists.includes(cleanGoogleTrack.artist) &&
+            track.album.name === cleanGoogleTrack.album
+        );
+        if (bestIndex === -1) {
+          console.log('None of them match exactly');
+          // Pick index 0 because I don't know any better
+          bestIndex = 0;
+        }
+        searchResults.tracks.items[0].chosen = true;
+      }
+
+      // Return the track with the search results
       track.spotifyTracks = searchResults.tracks.items;
       return track;
     })
   );
 
-  console.log('After search');
-  console.log(req.session.googlePlaylists[playlistId].tracks[0]);
+  // console.log('After search');
+  // console.log(req.session.googlePlaylists[playlistId].tracks[0]);
 
   // Render this playlist
   res.render('google_tracklist', {
@@ -571,72 +615,30 @@ app.get('/google_playlists/:playlistId/track/:trackId', async (req, res) => {
   const playlistId = req.params.playlistId;
   const trackId = req.params.trackId;
 
-  // Check if the necessary googlePlaylists structures are present
+  // Check for Spotify access tokens
+  if (!req.session.tokens) {
+    // If not, redirect to login to get new tokens
+    res.redirect('/login');
+    return;
+  }
+
+  // Check for Google playlists and if this playlist and track exists
   if (
     !req.session.googlePlaylists ||
-    !req.session.googlePlaylists[playlistId]
+    !req.session.googlePlaylists[playlistId] ||
+    !req.session.googlePlaylists[playlistId].tracks[trackId]
   ) {
-    // If no playlist, redirect to google_playlists
-    res.redirect('/google_playlists');
-    return;
-  } else if (!req.session.googlePlaylists[playlistId].Tracks) {
-    // If not tracklist, redirect to google_playlist/<playlistId>
-    res.redirect(`/google_playlists/${playlistId}`);
-    return;
-  } else if (!req.session.access_token) {
-    // If no Spotify access token, redirect to the root
+    // If not, redirect to the root route
     res.redirect('/');
     return;
-  } else {
-    // Clean up the track/artist/album info to search in Spotify
-    // Removing all parenthetical phrases as they tend to be
-    // featured artists and other info that makes it hard to search
-    const removeParentheticalRegEx = /\(.*\)/g;
-    const origGoogleTrack =
-      req.session.googlePlaylists[playlistId].Tracks[trackId];
-    const cleanGoogleTrack = {};
-    cleanGoogleTrack.Title = origGoogleTrack.Title.replace(
-      removeParentheticalRegEx,
-      ''
-    );
-    cleanGoogleTrack.Artist = origGoogleTrack.Artist.replace(
-      removeParentheticalRegEx,
-      ''
-    );
-    cleanGoogleTrack.Album = origGoogleTrack.Album.replace(
-      removeParentheticalRegEx,
-      ''
-    );
-
-    // Get Spotify search results based on the Google track info
-    const searchResults = await getSpotifyData(
-      'https://api.spotify.com/v1/search',
-      {
-        access: req.session.access_token,
-        refresh: req.session.refresh_token
-      },
-      {
-        q: `track:${cleanGoogleTrack.Title} artist:${cleanGoogleTrack.Artist} album:${cleanGoogleTrack.Album}`,
-        type: 'track'
-      }
-    );
-    // console.log('Spotify returned search results:');
-    // if (searchResults.tracks.total > 0) {
-    //   console.log(searchResults.tracks.items);
-    // } else {
-    //   console.log('No results');
-    // }
-
-    // Render the page
-    res.render('google_single_track', {
-      track: req.session.googlePlaylists[playlistId].Tracks[trackId],
-      playlistId: playlistId,
-      trackId: trackId,
-      numResults: searchResults.tracks.total,
-      searchResults:
-        searchResults.tracks.total > 0 ? searchResults.tracks.items : {}
-    });
   }
+
+  // Render the page
+  res.render('google_single_track', {
+    playlists: req.session.googlePlaylists,
+    playlistId: playlistId,
+    trackId: trackId
+  });
 });
 
 // Refresh Token route, from Spotify example code
