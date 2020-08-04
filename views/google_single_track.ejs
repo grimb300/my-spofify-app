@@ -70,6 +70,17 @@
     <% } %>
   </div>
 
+  <h3>Search for Spotify tracks</h3>
+  <form action="/google_playlists/<%=playlistId%>/track/<%=trackId%>" method="get">
+    <label for="track">Song Title</label>
+    <input type="text" name="track" id="track">
+    <label for="artist">Artist</label>
+    <input type="text" name="artist" id="artist">
+    <label for="album">Album</label>
+    <input type="text" name="album" id="album">
+    <input type="submit" value="Search">
+  </form>
+
   <h3>Found <%=numResults%> matching Spotify tracks</h3>
   <div class="spotify-wrapper">
     <% if (numResults > 0) { %>

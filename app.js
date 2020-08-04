@@ -641,6 +641,54 @@ app.get('/google_playlists/:playlistId/track/:trackId', async (req, res) => {
   });
 });
 
+app.get(
+  '/google_playlists/:playlistId/track/:trackId/pick_me/:spotifyTrackId',
+  (req, res) => {
+    const playlistId = req.params.playlistId;
+    const trackId = req.params.trackId;
+    const newSpotifyTrackId = req.params.spotifyTrackId;
+
+    // Check that all IDs are valid
+    if (
+      !req.session.googlePlaylists ||
+      !req.session.googlePlaylists[playlistId]
+    ) {
+      // If the playlist isn't valid, redirect to root route
+      res.redirect('/');
+      return;
+    } else if (!req.session.googlePlaylists[playlistId].tracks[trackId]) {
+      // If the track list isn't valid, redirect to playlist route
+      res.redirect(`/google_playlists/${playlistId}`);
+      return;
+    } else if (
+      !req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks[
+        newSpotifyTrackId
+      ]
+    ) {
+      // If the Spotify track isn't valid, redirect to track route
+      res.redirect(`/google_playlists/${playlistId}/track/${trackId}`);
+      return;
+    }
+
+    // Change which Spotify track is the chosen one
+    const oldSpotifyTrackId = req.session.googlePlaylists[playlistId].tracks[
+      trackId
+    ].spotifyTracks.findIndex((spotifyTrack) => {
+      return spotifyTrack.chosen;
+    });
+    console.log(`Old ID (${oldSpotifyTrackId}), New ID (${newSpotifyTrackId})`);
+    req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks[
+      oldSpotifyTrackId
+    ].chosen = false;
+    req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks[
+      newSpotifyTrackId
+    ].chosen = true;
+
+    // Redirect to the playlist route
+    res.redirect(`/google_playlists/${playlistId}`);
+  }
+);
+
 // Refresh Token route, from Spotify example code
 app.get('/refresh_token', (req, res) => {
   // console.log(`Session (/refresh_token):`);
