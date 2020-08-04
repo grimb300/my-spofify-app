@@ -10,7 +10,6 @@
 <body>
   <h1>My Spotify App</h1>
 
-  <h3>Details for Track <%=trackId%> in playlist <%=playlistId%></h3>
   <style>
     .track-wrapper {
       display: grid;
@@ -52,10 +51,9 @@
       padding: 10px;
     }
   </style>
+
+  <h3>Details for Track <%=trackId%> in playlist <%=playlistId%></h3>
   <div class="track-wrapper">
-    <!-- <div class="title"><strong>Title</strong></div>
-    <div class="artist"><strong>Artist</strong></div>
-    <div class="album"><strong>Album</strong></div> -->
     <% const track = playlists[playlistId].tracks[trackId]; %>
     <% const numResults = track.spotifyTracks.length; %>
     <% if (track) { %>
@@ -70,6 +68,25 @@
     <% } %>
   </div>
 
+  <h3>Chosen Spotify track</h3>
+  <div class="track-wrapper">
+    <% const chosenTrackId = track.spotifyTracks.findIndex((spotifyTrack) => spotifyTrack.chosen); %>
+    <% const chosenTrack = track.spotifyTracks[chosenTrackId]; %>
+    <% if (chosenTrack) { %>
+      <div class="track-heading">Title</div>
+      <div class="track-data"><%=chosenTrack.name%></div>
+      <div class="track-heading">Artist</div>
+      <div class="track-data"><%=chosenTrack.artists.map((artist) => artist.name).join(', ')%></div>
+      <div class="track-heading">Album</div>
+      <div class="track-data"><%=chosenTrack.album.name%></div>
+      <div class="track-heading">Track</></div>
+      <div class="track-data"><%=chosenTrack.track_number%></div>
+    <% } else { %>
+      <p>Track is empty</p>
+    <% } %>
+  </div>
+
+
   <h3>Search for Spotify tracks</h3>
   <form action="/google_playlists/<%=playlistId%>/track/<%=trackId%>" method="get">
     <label for="track">Song Title</label>
@@ -81,27 +98,56 @@
     <input type="submit" value="Search">
   </form>
 
-  <h3>Found <%=numResults%> matching Spotify tracks</h3>
-  <div class="spotify-wrapper">
-    <% if (numResults > 0) { %>
-      <% track.spotifyTracks.forEach((spotifyTrack, spotifyTrackId) => { %>
-        <div class="track-wrapper">
-          <div class="track-heading">Title</div>
-          <div class="track-data"><%=spotifyTrack.name%></div>
-          <div class="track-heading">Artist</div>
-          <div class="track-data"><%=spotifyTrack.artists.map((artist) => artist.name).join(', ')%></div>
-          <div class="track-heading">Album</div>
-          <div class="track-data"><%=spotifyTrack.album.name%></div>
-          <div class="track-heading">Track</></div>
-          <div class="track-data"><%=spotifyTrack.track_number%></div>
-        </div>
-        <div class="spotify"><a href="<%=spotifyTrack.uri%>" class="btn btn-primary">Listen Now!</a></div>
-        <div class="pick-me"><a href="/google_playlists/<%=playlistId%>/track/<%=trackId%>/pick_me/<%=spotifyTrackId%>" class="btn btn-primary">Pick Me!</a></div>
-      <% }) %>
+  <% const searchString = track.spotifySearchString; %>
+  <% const searchResults = track.spotifySearchResults; %>
+  <% if (searchString === '' && searchResults.length === 0) { %>
+    <h3>Found <%=numResults - 1%> other Spotify tracks</h3>
+    <div class="spotify-wrapper">
+      <% if (numResults > 1) { %>
+        <% track.spotifyTracks.forEach((spotifyTrack, spotifyTrackId) => { %>
+          <% if (spotifyTrackId !== chosenTrackId) { %>
+            <div class="track-wrapper">
+              <div class="track-heading">Title</div>
+              <div class="track-data"><%=spotifyTrack.name%></div>
+              <div class="track-heading">Artist</div>
+              <div class="track-data"><%=spotifyTrack.artists.map((artist) => artist.name).join(', ')%></div>
+              <div class="track-heading">Album</div>
+              <div class="track-data"><%=spotifyTrack.album.name%></div>
+              <div class="track-heading">Track</></div>
+              <div class="track-data"><%=spotifyTrack.track_number%></div>
+            </div>
+            <div class="spotify"><a href="<%=spotifyTrack.uri%>" class="btn btn-primary">Listen on Spotify</a></div>
+            <div class="pick-me"><a href="/google_playlists/<%=playlistId%>/track/<%=trackId%>/pick_search_result/<%=spotifyTrackId%>" class="btn btn-primary">Pick Me!</a></div>
+          <% } %>
+        <% }) %>
+      <% } else { %>
+        <p>Search results are empty</p>
+      <% } %>
+    </div>
     <% } else { %>
-      <p>Search results are empty</p>
-    <% } %>
-  </div>
+      <% const numSearchResults = searchResults.length; %>
+      <h3>Spotify search found <%=numSearchResults%> tracks: <%=searchString%></h3>
+      <div class="spotify-wrapper">
+        <% if (numSearchResults > 0) { %>
+          <% searchResults.forEach((spotifyTrack, spotifyTrackId) => { %>
+            <div class="track-wrapper">
+              <div class="track-heading">Title</div>
+              <div class="track-data"><%=spotifyTrack.name%></div>
+              <div class="track-heading">Artist</div>
+              <div class="track-data"><%=spotifyTrack.artists.map((artist) => artist.name).join(', ')%></div>
+              <div class="track-heading">Album</div>
+              <div class="track-data"><%=spotifyTrack.album.name%></div>
+              <div class="track-heading">Track</></div>
+              <div class="track-data"><%=spotifyTrack.track_number%></div>
+            </div>
+            <div class="spotify"><a href="<%=spotifyTrack.uri%>" class="btn btn-primary">Listen on Spotify</a></div>
+            <div class="pick-me"><a href="/google_playlists/<%=playlistId%>/track/<%=trackId%>/pick_me/<%=spotifyTrackId%>" class="btn btn-primary">Pick Me!</a></div>
+          <% }) %>
+        <% } else { %>
+          <p>Search results are empty</p>
+        <% } %>
+      </div>
+  <% } %>
 
   <!-- Latest compiled and minified JavaScript -->
   <!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script> -->

@@ -633,6 +633,34 @@ app.get('/google_playlists/:playlistId/track/:trackId', async (req, res) => {
     return;
   }
 
+  // If the user has provided search terms, search now
+  const searchString = [
+    req.query.track ? `track:${req.query.track}` : '',
+    req.query.artist ? `artist:${req.query.artist}` : '',
+    req.query.album ? `album:${req.query.album}` : ''
+  ]
+    .filter((element) => element !== '')
+    .join(' ');
+  console.log(`Searching for: ${searchString}`);
+  let searchResults = [];
+  if (searchString !== '') {
+    const spotifySearchResults = await getSpotifyData(
+      'https://api.spotify.com/v1/search',
+      req.session.tokens,
+      {
+        q: searchString,
+        type: 'track'
+      }
+    );
+    searchResults = spotifySearchResults.tracks.items;
+  }
+  req.session.googlePlaylists[playlistId].tracks[
+    trackId
+  ].spotifySearchString = searchString;
+  req.session.googlePlaylists[playlistId].tracks[
+    trackId
+  ].spotifySearchResults = searchResults;
+
   // Render the page
   res.render('google_single_track', {
     playlists: req.session.googlePlaylists,
