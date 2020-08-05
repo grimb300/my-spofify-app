@@ -42,6 +42,10 @@ app.use(
 // Set the public directory as static
 app.use(express.static(__dirname + '/public'));
 
+// To parse the body data
+const bodyParser = require('body-parser');
+app.use(bodyParser.urlencoded({ extended: true }));
+
 // Set the view engine to ejs
 app.set('view engine', 'ejs');
 
@@ -211,8 +215,8 @@ app.get('/', async (req, res) => {
     'https://api.spotify.com/v1/me/playlists',
     req.session.tokens
   );
-  console.log('Spotify playlist data:');
-  console.log(spotifyPlaylists.items);
+  // console.log('Spotify playlist data:');
+  // console.log(spotifyPlaylists.items);
   // console.log('Rendering playlists with googlePlaylists:');
   // console.log(req.session.googlePlaylists);
   res.render('playlists', {
@@ -220,6 +224,46 @@ app.get('/', async (req, res) => {
     googlePlaylists: req.session.googlePlaylists,
     spotifyPlaylists: spotifyPlaylists.items
   });
+});
+
+app.post('/playlist/add', async (req, res) => {
+  console.log('/playlist/add route with body:');
+  console.log(req.body);
+
+  // Get the particulars for the new Spotify playlist out of the request body
+  const playlist = req.body.playlist;
+
+  // Check for Spotify access tokens
+  if (!req.session.tokens) {
+    // Redirect to login to get new tokens
+    res.redirect('/login');
+    return;
+  }
+
+  // Check for Google playlists
+  if (
+    !req.session.googlePlaylists ||
+    !req.session.googlePlaylists[playlist.id]
+  ) {
+    // If not, redirect back to the root route
+    res.redirect('/');
+    return;
+  }
+
+  // Create the playlist
+  const userId = req.session.user.id;
+  const response = await postSpotifyData(
+    `https://api.spotify.com/v1/users/${userId}/playlists`,
+    req.session.tokens,
+    {
+      name: playlist.title,
+      description: playlist.description
+    }
+  );
+  console.log('Response from playlist creation');
+  console.log(response);
+
+  res.redirect('/');
 });
 
 // Login route, borrowed from the Spotify example code
@@ -846,7 +890,7 @@ const getSpotifyData = async (apiEndpoint, tokens, params) => {
   }
 };
 
-const postSpotifyData = async (apiEndpoint, bodyData, tokens) => {
+const postSpotifyData = async (apiEndpoint, tokens, bodyData) => {
   try {
     console.log(`Sending PUT request to ${apiEndpoint}`);
     const resp = await axios({

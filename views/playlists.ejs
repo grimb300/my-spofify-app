@@ -6,7 +6,7 @@
     <div class="column-heading">Google Playlist</div>
     <div class="column-heading">Spotify Playlist</div>
   </div>
-    <% googlePlaylists.forEach((googlePlaylist) => { %>
+    <% googlePlaylists.forEach((googlePlaylist, googlePlaylistId) => { %>
       <div class="playlist-row playlist-entry-row">
         <div class="individual-playlist-wrapper">
           <div class="playlist-title"><%=googlePlaylist.title%></div>
@@ -25,7 +25,14 @@
             <div class="playlist-title">No matching playlist found</div>
             <div class="playlist-description"></div>
             <div class="playlist-num-tracks"></div>
-            <div class="playlist-button"><button>Add playlist</button></div>
+            <div class="playlist-button">
+              <form action="/playlist/add" method="post">
+                <input type="hidden" name="playlist[id]" value="<%=googlePlaylistId%>">
+                <input type="hidden" name="playlist[title]" value="<%=googlePlaylist.title%>">
+                <input type="hidden" name="playlist[description]" value="<%=googlePlaylist.description%>">
+                <input type="submit" value="Add Playlist">
+              </form>
+            </div>
           <% } %>
         </div>
       </div>
