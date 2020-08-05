@@ -117,7 +117,7 @@
               <div class="track-data"><%=spotifyTrack.track_number%></div>
             </div>
             <div class="spotify"><a href="<%=spotifyTrack.uri%>" class="btn btn-primary">Listen on Spotify</a></div>
-            <div class="pick-me"><a href="/google_playlists/<%=playlistId%>/track/<%=trackId%>/pick_search_result/<%=spotifyTrackId%>" class="btn btn-primary">Pick Me!</a></div>
+            <div class="pick-me"><a href="/google_playlists/<%=playlistId%>/track/<%=trackId%>/pick_me/<%=spotifyTrackId%>" class="btn btn-primary">Pick Me!</a></div>
           <% } %>
         <% }) %>
       <% } else { %>
@@ -141,7 +141,7 @@
               <div class="track-data"><%=spotifyTrack.track_number%></div>
             </div>
             <div class="spotify"><a href="<%=spotifyTrack.uri%>" class="btn btn-primary">Listen on Spotify</a></div>
-            <div class="pick-me"><a href="/google_playlists/<%=playlistId%>/track/<%=trackId%>/pick_me/<%=spotifyTrackId%>" class="btn btn-primary">Pick Me!</a></div>
+            <div class="pick-me"><a href="/google_playlists/<%=playlistId%>/track/<%=trackId%>/pick_search_result/<%=spotifyTrackId%>" class="btn btn-primary">Pick Me!</a></div>
           <% }) %>
         <% } else { %>
           <p>Search results are empty</p>
