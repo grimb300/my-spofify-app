@@ -206,17 +206,19 @@ app.get('/', async (req, res) => {
   } else {
     console.log('googlePlaylists already defined');
   }
-  const spotifyPlaylists = [];
-  // const spotifyPlaylists = await getSpotifyData(
-  //   'https//api.spotify.com/v1/me/playlists',
-  //   req.session.tokens
-  // );
-  // console.log('Spotify playlist data:');
-  // console.log(spotifyPlaylists);
-  res.render('user', {
+  // const spotifyPlaylists = [];
+  const spotifyPlaylists = await getSpotifyData(
+    'https://api.spotify.com/v1/me/playlists',
+    req.session.tokens
+  );
+  console.log('Spotify playlist data:');
+  console.log(spotifyPlaylists.items);
+  // console.log('Rendering playlists with googlePlaylists:');
+  // console.log(req.session.googlePlaylists);
+  res.render('playlists', {
     user: req.session.user,
     googlePlaylists: req.session.googlePlaylists,
-    spotifyPlaylists: spotifyPlaylists
+    spotifyPlaylists: spotifyPlaylists.items
   });
 });
 
@@ -227,8 +229,14 @@ app.get('/login', (req, res) => {
   req.session[stateKey] = state;
 
   // your application requests authorization
-  const scope =
-    'user-read-private user-read-email playlist-modify-public playlist-modify-private';
+  const scope = [
+    'user-read-private',
+    'user-read-email',
+    'playlist-read-private',
+    'playlist-read-collaborative',
+    'playlist-modify-public',
+    'playlist-modify-private'
+  ].join(' ');
   res.redirect(
     'https://accounts.spotify.com/authorize?' +
       querystring.stringify({
