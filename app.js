@@ -198,7 +198,9 @@ app.get('/', async (req, res) => {
             };
           },
           skip_empty_lines: true
-        }).sort((a, b) => a.playlistIndex - b.playlistIndex);
+        })
+          // Sort the tracks on playlistIndex
+          .sort((a, b) => a.playlistIndex - b.playlistIndex);
 
         // Return the playlist with track list
         playlist.tracks = googleTracks;
@@ -210,25 +212,35 @@ app.get('/', async (req, res) => {
   } else {
     console.log('googlePlaylists already defined');
   }
-  // const spotifyPlaylists = [];
+
+  // Get the user's Spotify playlists
   const spotifyPlaylists = await getSpotifyData(
     'https://api.spotify.com/v1/me/playlists',
     req.session.tokens
   );
-  // console.log('Spotify playlist data:');
-  // console.log(spotifyPlaylists.items);
-  // console.log('Rendering playlists with googlePlaylists:');
-  // console.log(req.session.googlePlaylists);
-  res.render('playlists', {
+
+  // Map the Spotify playlists onto the Google playlists
+  req.session.spotifyPlaylists = spotifyPlaylists.items.map(
+    (spotifyPlaylist) => {
+      const googlePlaylistId = req.session.googlePlaylists.findIndex(
+        (googlePlaylist) => googlePlaylist.title === spotifyPlaylist.name
+      );
+      spotifyPlaylist.googlePlaylistId = googlePlaylistId;
+      return spotifyPlaylist;
+    }
+  );
+  // console.log(req.session.spotifyPlaylists);
+
+  res.render('library', {
     user: req.session.user,
     googlePlaylists: req.session.googlePlaylists,
-    spotifyPlaylists: spotifyPlaylists.items
+    spotifyPlaylists: req.session.spotifyPlaylists
   });
 });
 
 app.post('/playlist/add', async (req, res) => {
-  console.log('/playlist/add route with body:');
-  console.log(req.body);
+  // console.log('/playlist/add route with body:');
+  // console.log(req.body);
 
   // Get the particulars for the new Spotify playlist out of the request body
   const playlist = req.body.playlist;
@@ -252,7 +264,7 @@ app.post('/playlist/add', async (req, res) => {
 
   // Create the playlist
   const userId = req.session.user.id;
-  const response = await postSpotifyData(
+  const createdPlaylist = await postSpotifyData(
     `https://api.spotify.com/v1/users/${userId}/playlists`,
     req.session.tokens,
     {
@@ -260,10 +272,105 @@ app.post('/playlist/add', async (req, res) => {
       description: playlist.description
     }
   );
-  console.log('Response from playlist creation');
-  console.log(response);
+  createdPlaylist.googlePlaylistId = playlist.id;
+  req.session.spotifyPlaylists.push(createdPlaylist);
+  // console.log('Response from playlist creation');
+  // console.log(createdPlaylist);
 
-  res.redirect('/');
+  res.redirect(`/playlist/${playlist.id}`);
+});
+
+app.get('/playlist/:id', async (req, res) => {
+  const playlistId = req.params.id;
+
+  // Check for Spotify access tokens
+  if (!req.session.tokens) {
+    // Redirect to login to get new tokens
+    res.redirect('/login');
+    return;
+  }
+
+  // Check for Google playlists
+  if (
+    !req.session.googlePlaylists ||
+    !req.session.googlePlaylists[playlistId]
+  ) {
+    // If not, redirect back to the root route
+    res.redirect('/');
+    return;
+  }
+
+  console.log(`/playlist/${playlistId} route`);
+
+  // Get the Google and Spotify (if present) playlists
+  const googlePlaylist = req.session.googlePlaylists[playlistId];
+  const spotifyPlaylist = req.session.spotifyPlaylists.find(
+    (spotifyPlaylist) => spotifyPlaylist.googlePlaylistId === playlistId
+  );
+
+  // Add Spotify tracks to the Google tracks, if necessary
+  console.log(`There are ${googlePlaylist.tracks.length} Google tracks`);
+  googlePlaylist.tracks = await Promise.all(
+    googlePlaylist.tracks.map(async (googleTrack) => {
+      console.log(`Checking spotifyTrack for (${typeof googleTrack}):`);
+      console.log(googleTrack);
+      // The mere presence of a 'spotifyTrack' field means don't do anything
+      if ('spotifyTrack' in Object.keys(googleTrack)) {
+        console.log('spotifyTrack already exits');
+        return googleTrack;
+      }
+
+      // Search Spotify based on the Google track info
+      const searchString = `track:${googleTrack.title} artist:${googleTrack.artist} album:${googleTrack.album}`;
+      console.log(`Searching on Spotify for: ${searchString}`);
+      const searchResults = await getSpotifyData(
+        'https://api.spotify.com/v1/search',
+        req.session.tokens,
+        {
+          q: searchString,
+          type: 'track'
+        }
+      );
+
+      console.log(`Search returned ${searchResults.tracks.total} results`);
+
+      // Check the results
+      if (searchResults.tracks.total === 0) {
+        // If no results, set spotifyTrack to false (so it is definitely falsey)
+        googleTrack.spotifyTrack = false;
+      } else if (searchResults.tracks.total === 1) {
+        // If only one is returned, the choice is obvious
+        googleTrack.spotifyTrack = searchResults.tracks.items[0];
+      } else {
+        // Find the best fit
+        const bestFit = searchResults.tracks.items.find(
+          (spotifyTrack) =>
+            spotifyTrack.name === googleTrack.title &&
+            spotifyTrack.artists.includes(googleTrack.artist) &&
+            spotifyTrack.album.name === googleTrack.album
+        );
+
+        if (bestFit) {
+          // If found, update spotifyTrack
+          googleTrack.spotifyTrack = bestFit;
+        } else {
+          // Otherwise punt and take the first one in the list
+          googleTrack.spotifyTrack = searchResults.tracks.items[0];
+        }
+      }
+
+      // Return the updated googleTrack object
+      return googleTrack;
+    })
+  );
+
+  // Render this playlist
+  res.render('playlist', {
+    user: req.session.user,
+    googlePlaylist: googlePlaylist,
+    spotifyPlaylist: spotifyPlaylist,
+    playlistId: playlistId
+  });
 });
 
 // Login route, borrowed from the Spotify example code
@@ -395,8 +502,8 @@ app.get('/playlists', (req, res) => {
         }
       );
 
-      // Render the playlists page
-      res.render('playlists', {
+      // Render the library page
+      res.render('library', {
         user: req.session.user,
         playlists: playlistsData.items
       });
@@ -859,7 +966,7 @@ app.get('/refresh_token', (req, res) => {
 });
 
 app.listen(port, () =>
-  console.log(`App listening at httpL//localhost:${port}`)
+  console.log(`App listening at http://localhost:${port}`)
 );
 
 // -------------------------------------------

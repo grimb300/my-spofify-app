@@ -1,0 +1,42 @@
+<%- include('./partials/header'); %>
+
+<h3>Editing Playlist: <%=googlePlaylist.title%></h3>
+<div class="playlist-wrapper">
+  <div class="playlist-row playlist-heading">
+    <div class="column-heading">Track No.</div>
+    <div class="column-heading">Google</div>
+    <div class="column-heading">Spotify</div>
+  </div>
+  <% googlePlaylist.tracks.forEach((googleTrack, trackId) => { %>
+    <div class="playlist-row playlist-entry">
+      <div class="playlist-track-id"><%=trackId%></div>
+      <div class="playlist-track">
+        <div class="track-heading">Title</div>
+        <div class="track-data"><%=googleTrack.title%></div>
+        <div class="track-heading">Artist</div>
+        <div class="track-data"><%=googleTrack.artist%></div>
+        <div class="track-heading">Album</div>
+        <div class="track-data"><%=googleTrack.album%></div>
+        <div class="track-button"><button>Delete</button></div>
+      </div>
+      <div class="playlist-track">
+        <% if (googleTrack.spotifyTrack) { %>
+          <% const spotifyTrack = googleTrack.spotifyTrack; %>
+          <div class="track-heading">Title</div>
+          <div class="track-data"><%=spotifyTrack.name%></div>
+          <div class="track-heading">Artist</div>
+          <div class="track-data"><%=spotifyTrack.artists.map((artist) => artist.name).join(', ')%></div>
+          <div class="track-heading">Album</div>
+          <div class="track-data"><%=spotifyTrack.album.name%></div>
+          <div class="track-heading">Track No</div>
+          <div class="track-data"><%=spotifyTrack.track_number%></div>
+        <% } else { %>
+          <div class="track-data">No matching Spotify track</div>
+        <% } %>
+        <div class="track-button"><button>Edit</button></div>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<%- include('./partials/footer'); %>
