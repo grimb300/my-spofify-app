@@ -209,8 +209,6 @@ app.get('/', async (req, res) => {
     );
 
     req.session.googlePlaylists = googlePlaylists;
-  } else {
-    console.log('googlePlaylists already defined');
   }
 
   // Get the user's Spotify playlists
@@ -229,7 +227,6 @@ app.get('/', async (req, res) => {
       return spotifyPlaylist;
     }
   );
-  // console.log(req.session.spotifyPlaylists);
 
   res.render('library', {
     user: req.session.user,
@@ -239,9 +236,6 @@ app.get('/', async (req, res) => {
 });
 
 app.post('/playlist/add', async (req, res) => {
-  // console.log('/playlist/add route with body:');
-  // console.log(req.body);
-
   // Get the particulars for the new Spotify playlist out of the request body
   const playlist = req.body.playlist;
 
@@ -274,8 +268,6 @@ app.post('/playlist/add', async (req, res) => {
   );
   createdPlaylist.googlePlaylistId = playlist.id;
   req.session.spotifyPlaylists.push(createdPlaylist);
-  // console.log('Response from playlist creation');
-  // console.log(createdPlaylist);
 
   res.redirect(`/playlist/${playlist.id}`);
 });
@@ -300,8 +292,6 @@ app.get('/playlist/:id', async (req, res) => {
     return;
   }
 
-  console.log(`/playlist/${playlistId} route`);
-
   // Get the Google and Spotify (if present) playlists
   const googlePlaylist = req.session.googlePlaylists[playlistId];
   const spotifyPlaylist = req.session.spotifyPlaylists.find(
@@ -314,7 +304,6 @@ app.get('/playlist/:id', async (req, res) => {
       // The mere presence of a 'spotifyTrack' field means don't do anything
       // if ('spotifyTrack' in Object.keys(googleTrack)) {
       if (googleTrack.spotifyTrack) {
-        console.log('spotifyTrack already exits');
         return googleTrack;
       }
 
@@ -444,17 +433,10 @@ app.post('/playlist/:playlistId/track/:trackId/update', async (req, res) => {
     req.session.tokens
   );
 
-  console.log('New Spotify Track');
-  console.log(spotifyTrack);
-
-  console.log('Google track before');
-  console.log(req.session.googlePlaylists[playlistId].tracks[trackId]);
   // Update the Spotify track in the Google track
   req.session.googlePlaylists[playlistId].tracks[
     trackId
   ].spotifyTrack = spotifyTrack;
-  console.log('Google track after');
-  console.log(req.session.googlePlaylists[playlistId].tracks[trackId]);
 
   // Redirect to the playlist route
   res.redirect(`/playlist/${playlistId}`);
@@ -496,8 +478,6 @@ app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
 
   // Create a search based on terms provided in the query
   // If no query, default to a search based on the Google track info
-  console.log('Request query');
-  console.log(req.query);
   const searchTerms = req.query.search
     ? req.query.search
     : {
@@ -512,8 +492,6 @@ app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
   ]
     .filter((term) => term !== '')
     .join(' ');
-  console.log(`Search string: ${searchString}`);
-  console.log(searchTerms);
 
   const searchResults = await getSpotifyData(
     'https://api.spotify.com/v1/search',
@@ -537,7 +515,6 @@ app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
 
 // Login route, borrowed from the Spotify example code
 app.get('/login', (req, res) => {
-  // console.log('/login route');
   const state = generateRandomString(16);
   req.session[stateKey] = state;
 
@@ -564,7 +541,6 @@ app.get('/login', (req, res) => {
 
 // Callback route, borrowed from the Spotify example code
 app.get('/callback', (req, res) => {
-  // console.log('/callback route');
   // Using callback function from: https://github.com/spotify/web-api-auth-examples/issues/55
 
   const code = req.query.code || null;
@@ -584,8 +560,6 @@ app.get('/callback', (req, res) => {
 
   req.session[stateKey] = null;
 
-  // console.log('Sending POST request to api/token');
-
   axios({
     url: 'https://accounts.spotify.com/api/token',
     method: 'post',
@@ -604,9 +578,6 @@ app.get('/callback', (req, res) => {
     }
   })
     .then(async (response) => {
-      // console.log(`Received a valid response (${response.status}) with data:`);
-      // console.log(response.data);
-
       // Add the tokens to the session data
       req.session.tokens = {
         access: response.data.access_token,
@@ -630,7 +601,6 @@ app.get('/callback', (req, res) => {
 
 // User route
 app.get('/user', (req, res) => {
-  // console.log('/user route');
   // Check to see if we have a token
   if (req.session.access_token) {
     // Get the user data
@@ -719,8 +689,6 @@ app.get('/search', (req, res) => {
       );
 
       // Render the search results page
-      // console.log('Rendering search_results with tracklist');
-      // console.log(searchResults.tracks.items);
       res.render('search_results', {
         tracklist: searchResults.tracks.items
       });
@@ -745,8 +713,6 @@ app.get('/create_playlist', (req, res) => {
       );
 
       // Render the search results page
-      // console.log('Rendering search_results with tracklist');
-      // console.log(searchResults.tracks.items);
       res.render('search_results', {
         tracklist: searchResults.tracks.items
       });
@@ -800,9 +766,6 @@ app.get('/google_playlists', async (req, res) => {
               return playlist.Directory === directoryName;
             });
             if (matchingPlaylist === undefined) {
-              // console.log(
-              //   `Adding ${directoryName} to the googlePlaylists array`
-              // );
               googlePlaylists.push({
                 Title: directoryName,
                 Owner: 'Bob Grim',
@@ -821,7 +784,6 @@ app.get('/google_playlists', async (req, res) => {
         res.render('google_playlists', { playlists: googlePlaylists });
       });
   } else {
-    // console.log('Already imported playlists');
     // TODO: Fix async problems which force rendering down each path
     res.render('google_playlists', { playlists: req.session.googlePlaylists });
   }
@@ -889,21 +851,14 @@ app.get('/google_playlists/:id', async (req, res) => {
           type: 'track'
         }
       );
-      // console.log('Spotify tracks');
-      // console.log(searchResults.tracks.items);
 
       // Check how many results are returned
       if (searchResults.tracks.items.length === 0) {
         // If there are no results, just notify for now
-        console.log(`No search results for: ${searchString}`);
       } else if (searchResults.tracks.items.length === 1) {
         // If there is only one result it has to be the chosen one
         searchResults.tracks.items[0].chosen = true;
       } else {
-        console.log(
-          `There are ${searchResults.tracks.items
-            .length} matching spotify tracks`
-        );
         // There are multiple results, choose the best fit
         let bestIndex = searchResults.tracks.items.find(
           (track) =>
@@ -912,7 +867,6 @@ app.get('/google_playlists/:id', async (req, res) => {
             track.album.name === cleanGoogleTrack.album
         );
         if (bestIndex === -1) {
-          console.log('None of them match exactly');
           // Pick index 0 because I don't know any better
           bestIndex = 0;
         }
@@ -924,9 +878,6 @@ app.get('/google_playlists/:id', async (req, res) => {
       return track;
     })
   );
-
-  // console.log('After search');
-  // console.log(req.session.googlePlaylists[playlistId].tracks[0]);
 
   // Render this playlist
   res.render('google_tracklist', {
@@ -965,7 +916,6 @@ app.get('/google_playlists/:playlistId/track/:trackId', async (req, res) => {
   ]
     .filter((element) => element !== '')
     .join(' ');
-  console.log(`Searching for: ${searchString}`);
   let searchResults = [];
   if (searchString !== '') {
     const spotifySearchResults = await getSpotifyData(
@@ -1028,7 +978,6 @@ app.get(
     ].spotifyTracks.findIndex((spotifyTrack) => {
       return spotifyTrack.chosen;
     });
-    console.log(`Old ID (${oldSpotifyTrackId}), New ID (${newSpotifyTrackId})`);
     req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks[
       oldSpotifyTrackId
     ].chosen = false;
@@ -1047,9 +996,6 @@ app.get(
     const playlistId = req.params.playlistId;
     const trackId = req.params.trackId;
     const newSpotifyTrackId = req.params.spotifyTrackId;
-    console.log(
-      `Inside pick_spotify_search route: playlist (${playlistId}) track (${trackId}) search result (${newSpotifyTrackId})`
-    );
 
     // Check that all IDs are valid
     if (
@@ -1078,7 +1024,6 @@ app.get(
     ].spotifyTracks.findIndex((spotifyTrack) => {
       return spotifyTrack.chosen;
     });
-    console.log(`Old ID (${oldSpotifyTrackId}), New ID (${newSpotifyTrackId})`);
     req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks[
       oldSpotifyTrackId
     ].chosen = false;
@@ -1099,8 +1044,6 @@ app.get(
 
 // Refresh Token route, from Spotify example code
 app.get('/refresh_token', (req, res) => {
-  // console.log(`Session (/refresh_token):`);
-  // console.log(req.session);
   // requesting access token from refresh token
   var refresh_token = req.query.refresh_token;
   var authOptions = {
@@ -1149,10 +1092,6 @@ const getSpotifyData = async (apiEndpoint, tokens, params) => {
       },
       params: paramsData
     });
-    // console.log('Full resp object');
-    // console.log(resp);
-    // console.log('Got a response');
-    // console.log(resp.data);
     return resp.data;
   } catch (err) {
     console.error(err);
@@ -1172,10 +1111,6 @@ const postSpotifyData = async (apiEndpoint, tokens, bodyData) => {
         Authorization: `Bearer ${tokens.access}`
       }
     });
-    // console.log('Full resp object');
-    // console.log(resp);
-    // console.log('Got a response');
-    // console.log(resp.data);
     return resp.data;
   } catch (err) {
     console.error(err);
