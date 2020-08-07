@@ -14,6 +14,18 @@ header > h3 {
   text-align: right;
 }
 
+/* Common styles for all templates */
+
+.alert {
+  background-color: rgba(255, 0, 0, .5);
+}
+
+.header-button {
+  margin-bottom: 15px;
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
 /* Styles for library.ejs */
 
 .library-wrapper {
@@ -45,11 +57,6 @@ header > h3 {
   display: grid;
   grid-template-columns: 4fr 1fr;
   column-gap: 10px;
-}
-
-/* .library-playlist.alert { */
-.alert {
-  background-color: rgba(255, 0, 0, .5);
 }
 
 .library-playlist > .library-playlist-title {

@@ -1,6 +1,10 @@
 <%- include('./partials/header'); %>
 
 <h3>Editing Playlist: <%=googlePlaylist.title%></h3>
+<div>
+  <a href="/"><button class="header-button">Cancel</button></a>
+  <a href="/playlist/<%=playlistId%>/upload"><button class="header-button">Upload to Spotify</button></a>
+</div>
 <div class="playlist-wrapper">
   <div class="playlist-row playlist-column-heading">
     <div class="column-heading">Track No.</div>
