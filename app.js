@@ -312,7 +312,8 @@ app.get('/playlist/:id', async (req, res) => {
   googlePlaylist.tracks = await Promise.all(
     googlePlaylist.tracks.map(async (googleTrack) => {
       // The mere presence of a 'spotifyTrack' field means don't do anything
-      if ('spotifyTrack' in Object.keys(googleTrack)) {
+      // if ('spotifyTrack' in Object.keys(googleTrack)) {
+      if (googleTrack.spotifyTrack) {
         console.log('spotifyTrack already exits');
         return googleTrack;
       }
@@ -365,6 +366,60 @@ app.get('/playlist/:id', async (req, res) => {
     spotifyPlaylist: spotifyPlaylist,
     playlistId: playlistId
   });
+});
+
+app.post('/playlist/:playlistId/track/:trackId', async (req, res) => {
+  const playlistId = req.params.playlistId;
+  const trackId = req.params.trackId;
+  const spotifyTrackId = req.body.spotifyTrackId;
+
+  // Check for Spotify access tokens
+  if (!req.session.tokens) {
+    // If not, redirect to login to get new tokens
+    res.redirect('/login');
+    return;
+  }
+
+  // Check for Google playlists and if this playlist exists
+  if (
+    !req.session.googlePlaylists ||
+    !req.session.googlePlaylists[playlistId]
+  ) {
+    // If not, redirect back to the root route
+    res.redirect('/');
+    return;
+  }
+
+  // Check that this track exists
+  if (
+    !req.session.googlePlaylists[playlistId].tracks ||
+    !req.session.googlePlaylists[playlistId].tracks[trackId]
+  ) {
+    // If not, redirect back to the playlist route
+    res.redirect(`/playlist/${playlistId}`);
+    return;
+  }
+
+  // Get the Spotify track
+  const spotifyTrack = await getSpotifyData(
+    `https://api.spotify.com/v1/tracks/${spotifyTrackId}`,
+    req.session.tokens
+  );
+
+  console.log('New Spotify Track');
+  console.log(spotifyTrack);
+
+  console.log('Google track before');
+  console.log(req.session.googlePlaylists[playlistId].tracks[trackId]);
+  // Update the Spotify track in the Google track
+  req.session.googlePlaylists[playlistId].tracks[
+    trackId
+  ].spotifyTrack = spotifyTrack;
+  console.log('Google track after');
+  console.log(req.session.googlePlaylists[playlistId].tracks[trackId]);
+
+  // Redirect to the playlist route
+  res.redirect(`/playlist/${playlistId}`);
 });
 
 app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
