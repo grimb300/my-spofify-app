@@ -59,7 +59,7 @@
         <div class="result-data"><%=result.track_number%></div>
         <div class="result-play-button"><a href="<%=result.uri%>"><button>Play on Spotify</button></a></div>
         <div class="result-pick-button">
-          <form action="/playlist/<%=playlistId%>/track/<%=trackId%>" method="post">
+          <form action="/playlist/<%=playlistId%>/track/<%=trackId%>/update" method="post">
             <input type="hidden" name="spotifyTrackId" value="<%=result.id%>">
             <input type="submit" value="Pick Me!">
           </form>

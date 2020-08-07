@@ -17,7 +17,11 @@
         <div class="track-data"><%=googleTrack.artist%></div>
         <div class="track-heading">Album</div>
         <div class="track-data"><%=googleTrack.album%></div>
-        <div class="track-button"><button>Delete</button></div>
+        <div class="track-button">
+          <form action="/playlist/<%=playlistId%>/track/<%=trackId%>/delete" method="post">
+            <input type="submit" value="Delete Track">
+          </form>
+        </div>
       </div>
       <div class="playlist-track">
         <% if (googleTrack.spotifyTrack) { %>
@@ -34,9 +38,7 @@
           <div class="track-data">No matching Spotify track</div>
         <% } %>
         <div class="track-button">
-          <form action="/playlist/<%=playlistId%>/track/<%=trackId%>" method="get">
-            <input type="submit" value="Edit">
-          </form>
+          <a href="/playlist/<%=playlistId%>/track/<%=trackId%>"><button>Edit Track</button></a>
         </div>
       </div>
     </div>

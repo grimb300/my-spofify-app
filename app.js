@@ -368,7 +368,45 @@ app.get('/playlist/:id', async (req, res) => {
   });
 });
 
-app.post('/playlist/:playlistId/track/:trackId', async (req, res) => {
+app.post('/playlist/:playlistId/track/:trackId/delete', async (req, res) => {
+  const playlistId = req.params.playlistId;
+  const trackId = req.params.trackId;
+
+  // Check for Spotify access tokens
+  if (!req.session.tokens) {
+    // If not, redirect to login to get new tokens
+    res.redirect('/login');
+    return;
+  }
+
+  // Check for Google playlists and if this playlist exists
+  if (
+    !req.session.googlePlaylists ||
+    !req.session.googlePlaylists[playlistId]
+  ) {
+    // If not, redirect back to the root route
+    res.redirect('/');
+    return;
+  }
+
+  // Check that this track exists
+  if (
+    !req.session.googlePlaylists[playlistId].tracks ||
+    !req.session.googlePlaylists[playlistId].tracks[trackId]
+  ) {
+    // If not, redirect back to the playlist route
+    res.redirect(`/playlist/${playlistId}`);
+    return;
+  }
+
+  // Remove the Google track from the playlist
+  req.session.googlePlaylists[playlistId].tracks.splice(trackId, 1);
+
+  // Redirect to the playlist route
+  res.redirect(`/playlist/${playlistId}`);
+});
+
+app.post('/playlist/:playlistId/track/:trackId/update', async (req, res) => {
   const playlistId = req.params.playlistId;
   const trackId = req.params.trackId;
   const spotifyTrackId = req.body.spotifyTrackId;
