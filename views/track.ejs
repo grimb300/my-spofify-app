@@ -1,0 +1,76 @@
+<%- include('./partials/header'); %>
+
+<h3>Editing Track</h3>
+<div class="track-wrapper">
+  <div class="track-row track-column-heading">
+    <div class="column-heading">Google</div>
+    <div class="column-heading">Spotify</div>
+  </div>
+  <div class="track-row track-entry">
+    <div class="track-track">
+      <div class="track-heading">Title</div>
+      <div class="track-data"><%=googleTrack.title%></div>
+      <div class="track-heading">Artist</div>
+      <div class="track-data"><%=googleTrack.artist%></div>
+      <div class="track-heading">Album</div>
+      <div class="track-data"><%=googleTrack.album%></div>
+    </div>
+    <div class="track-track">
+      <% if (googleTrack.spotifyTrack) { %>
+        <% const spotifyTrack = googleTrack.spotifyTrack; %>
+        <div class="track-heading">Title</div>
+        <div class="track-data"><%=spotifyTrack.name%></div>
+        <div class="track-heading">Artist</div>
+        <div class="track-data"><%=spotifyTrack.artists.map((artist) => artist.name).join(', ')%></div>
+        <div class="track-heading">Album</div>
+        <div class="track-data"><%=spotifyTrack.album.name%></div>
+        <div class="track-heading">Track No</div>
+        <div class="track-data"><%=spotifyTrack.track_number%></div>
+      <% } else { %>
+        <div class="track-data">No matching Spotify track</div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<h3>Spotify Track Search</h3>
+<form action="/playlist/<%=playlistId%>/track/<%=trackId%>" method="get">
+  <label for="track">Song Title</label>
+  <input type="text" name="search[track]" id="track" value="<%=searchTerms.track%>">
+  <label for="artist">Artist</label>
+  <input type="text" name="search[artist]" id="artist" value="<%=searchTerms.artist%>">
+  <label for="album">Album</label>
+  <input type="text" name="search[album]" id="album" value="<%=searchTerms.album%>">
+  <input type="submit" value="Search">
+</form>
+
+<h3>Search Results</h3>
+<div class="result-wrapper">
+  <% if (searchResults.length > 0) { %>
+    <% searchResults.forEach((result) => { %>
+      <div class="result-row result-entry">
+        <div class="result-heading">Title</div>
+        <div class="result-data"><%=result.name%></div>
+        <div class="result-heading">Artist</div>
+        <div class="result-data"><%=result.artists.map((artist) => artist.name).join(', ')%></div>
+        <div class="result-heading">Album</div>
+        <div class="result-data"><%=result.album.name%></div>
+        <div class="result-heading">Track No</div>
+        <div class="result-data"><%=result.track_number%></div>
+        <div class="result-play-button"><a href="<%=result.uri%>"><button>Play on Spotify</button></a></div>
+        <div class="result-pick-button">
+          <form action="/playlist/<%=playlistId%>/track/<%=trackId%>" method="post">
+            <input type="hidden" name="spotifyTrackId" value="<%=result.id%>">
+            <input type="submit" value="Pick Me!">
+          </form>
+        </div>
+      </div>
+    <% }); %>
+  <% } else { %>
+    <div class="result-row result-entry">
+      <div class="result-data">No tracks matching search criteria</div>
+    </div>
+  <% } %>
+</div>
+
+<%- include('./partials/footer'); %>

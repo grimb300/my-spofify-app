@@ -2,7 +2,7 @@
 
 <h3>Editing Playlist: <%=googlePlaylist.title%></h3>
 <div class="playlist-wrapper">
-  <div class="playlist-row playlist-heading">
+  <div class="playlist-row playlist-column-heading">
     <div class="column-heading">Track No.</div>
     <div class="column-heading">Google</div>
     <div class="column-heading">Spotify</div>
@@ -33,7 +33,11 @@
         <% } else { %>
           <div class="track-data">No matching Spotify track</div>
         <% } %>
-        <div class="track-button"><button>Edit</button></div>
+        <div class="track-button">
+          <form action="/playlist/<%=playlistId%>/track/<%=trackId%>" method="get">
+            <input type="submit" value="Edit">
+          </form>
+        </div>
       </div>
     </div>
   <% }) %>

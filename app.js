@@ -309,11 +309,8 @@ app.get('/playlist/:id', async (req, res) => {
   );
 
   // Add Spotify tracks to the Google tracks, if necessary
-  console.log(`There are ${googlePlaylist.tracks.length} Google tracks`);
   googlePlaylist.tracks = await Promise.all(
     googlePlaylist.tracks.map(async (googleTrack) => {
-      console.log(`Checking spotifyTrack for (${typeof googleTrack}):`);
-      console.log(googleTrack);
       // The mere presence of a 'spotifyTrack' field means don't do anything
       if ('spotifyTrack' in Object.keys(googleTrack)) {
         console.log('spotifyTrack already exits');
@@ -322,7 +319,6 @@ app.get('/playlist/:id', async (req, res) => {
 
       // Search Spotify based on the Google track info
       const searchString = `track:${googleTrack.title} artist:${googleTrack.artist} album:${googleTrack.album}`;
-      console.log(`Searching on Spotify for: ${searchString}`);
       const searchResults = await getSpotifyData(
         'https://api.spotify.com/v1/search',
         req.session.tokens,
@@ -331,8 +327,6 @@ app.get('/playlist/:id', async (req, res) => {
           type: 'track'
         }
       );
-
-      console.log(`Search returned ${searchResults.tracks.total} results`);
 
       // Check the results
       if (searchResults.tracks.total === 0) {
@@ -370,6 +364,81 @@ app.get('/playlist/:id', async (req, res) => {
     googlePlaylist: googlePlaylist,
     spotifyPlaylist: spotifyPlaylist,
     playlistId: playlistId
+  });
+});
+
+app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
+  const playlistId = req.params.playlistId;
+  const trackId = req.params.trackId;
+
+  // Check for Spotify access tokens
+  if (!req.session.tokens) {
+    // If not, redirect to login to get new tokens
+    res.redirect('/login');
+    return;
+  }
+
+  // Check for Google playlists and if this playlist exists
+  if (
+    !req.session.googlePlaylists ||
+    !req.session.googlePlaylists[playlistId]
+  ) {
+    // If not, redirect back to the root route
+    res.redirect('/');
+    return;
+  }
+
+  // Check that this track exists
+  if (
+    !req.session.googlePlaylists[playlistId].tracks ||
+    !req.session.googlePlaylists[playlistId].tracks[trackId]
+  ) {
+    // If not, redirect back to the playlist route
+    res.redirect(`/playlist/${playlistId}`);
+    return;
+  }
+
+  // Get the Google track
+  const googleTrack = req.session.googlePlaylists[playlistId].tracks[trackId];
+
+  // Create a search based on terms provided in the query
+  // If no query, default to a search based on the Google track info
+  console.log('Request query');
+  console.log(req.query);
+  const searchTerms = req.query.search
+    ? req.query.search
+    : {
+        track: googleTrack.title,
+        artist: googleTrack.artist,
+        album: googleTrack.album
+      };
+  const searchString = [
+    searchTerms.track ? `track:${searchTerms.track}` : '',
+    searchTerms.artist ? `artist:${searchTerms.artist}` : '',
+    searchTerms.album ? `album:${searchTerms.album}` : ''
+  ]
+    .filter((term) => term !== '')
+    .join(' ');
+  console.log(`Search string: ${searchString}`);
+  console.log(searchTerms);
+
+  const searchResults = await getSpotifyData(
+    'https://api.spotify.com/v1/search',
+    req.session.tokens,
+    {
+      q: searchString,
+      type: 'track'
+    }
+  );
+
+  // Render track.ejs
+  res.render('track', {
+    user: req.session.user,
+    googleTrack: req.session.googlePlaylists[playlistId].tracks[trackId],
+    playlistId: playlistId,
+    trackId: trackId,
+    searchTerms: searchTerms,
+    searchResults: searchResults.tracks.items
   });
 });
 

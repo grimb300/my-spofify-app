@@ -32,7 +32,7 @@ header > h3 {
   word-break: break-all;
 }
 
-.library-heading {
+.library-column-heading {
   font-weight: bold;
   border-bottom: 2px solid black;
 }
@@ -87,7 +87,7 @@ header > h3 {
   word-break: break-all;
 }
 
-.playlist-heading {
+.playlist-column-heading {
   font-weight: bold;
   border-bottom: 2px solid black;
 }
@@ -123,4 +123,74 @@ header > h3 {
 
   text-align: center;
   align-self: center;
+}
+
+/* Styles for playlist.ejs */
+
+.track-wrapper {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 10px;
+
+  word-break: break-all;
+}
+
+.track-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 10px;
+
+  word-break: break-all;
+}
+
+.track-column-heading {
+  font-weight: bold;
+  border-bottom: 2px solid black;
+}
+
+.track-entry {
+  border-bottom: 1px dashed black;
+}
+
+.track-track {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  column-gap: 5px;
+}
+
+.result-wrapper {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 10px;
+
+  word-break: break-all;
+}
+
+.result-row {
+  display: grid;
+  grid-template-columns: 1fr 5fr 1fr 1fr;
+  column-gap: 5px;
+
+  word-break: break-all;
+}
+
+.result-entry {
+  border-bottom: 1px dashed black;
+}
+
+.result-heading {
+  font-weight: bold;
+  grid-column: 1;
+}
+
+.result-data {
+  grid-column: 2;
+}
+
+.result-play-button {
+  grid-column: 3;
+}
+
+.result-pick-button {
+  grid-column: 4;
 }

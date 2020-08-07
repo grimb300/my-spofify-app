@@ -2,7 +2,7 @@
 
 <h3>Library</h3>
 <div class="library-wrapper">
-  <div class="library-row library-heading">
+  <div class="library-row library-column-heading">
     <div class="column-heading">Google Playlist</div>
     <div class="column-heading">Spotify Playlist</div>
   </div>
@@ -20,7 +20,7 @@
             <div class="library-playlist-title"><%=foundSpotifyPlaylist.name%></div>
             <div class="library-playlist-description"><%=foundSpotifyPlaylist.description%></div>
             <div class="library-playlist-num-tracks"><%=foundSpotifyPlaylist.tracks.total%> tracks</div>
-            <div class="library-playlist-button"><button>Edit</button></div>
+            <div class="library-playlist-button"><a href="/playlist/<%=googlePlaylistId%>"><button>Edit</button></a></div>
           <% } else { %>
             <div class="library-playlist-title">No matching playlist found</div>
             <div class="library-playlist-description"></div>
