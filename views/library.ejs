@@ -12,28 +12,33 @@
           <div class="library-playlist-title"><%=googlePlaylist.title%></div>
           <div class="library-playlist-description"><%=googlePlaylist.description%></div>
           <div class="library-playlist-num-tracks"><%=googlePlaylist.tracks.length%> tracks</div>
-          <div class="library-playlist-button"><button>Delete</button></div>
+          <div class="library-playlist-button">
+            <form action="/playlist/<%=googlePlaylistId%>/delete" method="post">
+              <input type="submit" value="Delete Playlist">
+            </form>
+          </div>
         </div>
-        <div class="library-playlist">
-          <% const foundSpotifyPlaylist = spotifyPlaylists.find((spotifyPlaylist) => googlePlaylistId === spotifyPlaylist.googlePlaylistId); %>
-          <% if (foundSpotifyPlaylist) { %>
-            <div class="library-playlist-title"><%=foundSpotifyPlaylist.name%></div>
-            <div class="library-playlist-description"><%=foundSpotifyPlaylist.description%></div>
-            <div class="library-playlist-num-tracks"><%=foundSpotifyPlaylist.tracks.total%> tracks</div>
-            <div class="library-playlist-button"><a href="/playlist/<%=googlePlaylistId%>"><button>Edit</button></a></div>
-          <% } else { %>
-            <div class="library-playlist-title">No matching playlist found</div>
-            <div class="library-playlist-description"></div>
-            <div class="library-playlist-num-tracks"></div>
-            <div class="library-playlist-button">
-              <form action="/playlist/add" method="post">
-                <input type="hidden" name="playlist[id]" value="<%=googlePlaylistId%>">
-                <input type="hidden" name="playlist[title]" value="<%=googlePlaylist.title%>">
-                <input type="hidden" name="playlist[description]" value="<%=googlePlaylist.description%>">
-                <input type="submit" value="Create Playlist">
-              </form>
-            </div>
-          <% } %>
+        <% const foundSpotifyPlaylist = spotifyPlaylists.find((spotifyPlaylist) => googlePlaylistId === spotifyPlaylist.googlePlaylistId); %>
+        <% if (foundSpotifyPlaylist) { %>
+        <div class="library-playlist">  
+          <div class="library-playlist-title"><%=foundSpotifyPlaylist.name%></div>
+          <div class="library-playlist-description"><%=foundSpotifyPlaylist.description%></div>
+          <div class="library-playlist-num-tracks"><%=foundSpotifyPlaylist.tracks.total%> tracks</div>
+          <div class="library-playlist-button"><a href="/playlist/<%=googlePlaylistId%>"><button>Edit Playlist</button></a></div>
+        <% } else { %>
+        <div class="library-playlist alert">  
+          <div class="library-playlist-title">No matching playlist found</div>
+          <div class="library-playlist-description"></div>
+          <div class="library-playlist-num-tracks"></div>
+          <div class="library-playlist-button">
+            <form action="/playlist/add" method="post">
+              <input type="hidden" name="playlist[id]" value="<%=googlePlaylistId%>">
+              <input type="hidden" name="playlist[title]" value="<%=googlePlaylist.title%>">
+              <input type="hidden" name="playlist[description]" value="<%=googlePlaylist.description%>">
+              <input type="submit" value="Create Playlist">
+            </form>
+          </div>
+        <% } %>
         </div>
       </div>
     <% }); %>

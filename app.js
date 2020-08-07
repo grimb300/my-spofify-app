@@ -357,6 +357,33 @@ app.get('/playlist/:id', async (req, res) => {
   });
 });
 
+app.post('/playlist/:playlistId/delete', async (req, res) => {
+  const playlistId = req.params.playlistId;
+
+  // Check for Spotify access tokens
+  if (!req.session.tokens) {
+    // If not, redirect to login to get new tokens
+    res.redirect('/login');
+    return;
+  }
+
+  // Check for Google playlists and if this playlist exists
+  if (
+    !req.session.googlePlaylists ||
+    !req.session.googlePlaylists[playlistId]
+  ) {
+    // If not, redirect back to the root route
+    res.redirect('/');
+    return;
+  }
+
+  // Remove the Google playlist from the library
+  req.session.googlePlaylists.splice(playlistId, 1);
+
+  // Redirect to the root route
+  res.redirect(`/`);
+});
+
 app.post('/playlist/:playlistId/track/:trackId/delete', async (req, res) => {
   const playlistId = req.params.playlistId;
   const trackId = req.params.trackId;

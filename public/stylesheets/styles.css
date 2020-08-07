@@ -47,6 +47,11 @@ header > h3 {
   column-gap: 10px;
 }
 
+/* .library-playlist.alert { */
+.alert {
+  background-color: rgba(255, 0, 0, .5);
+}
+
 .library-playlist > .library-playlist-title {
   font-weight: bold;
   grid-column: 1;
@@ -168,7 +173,7 @@ header > h3 {
 
 .result-row {
   display: grid;
-  grid-template-columns: 1fr 5fr 1fr 1fr;
+  grid-template-columns: 2fr 5fr 1fr 1fr;
   column-gap: 5px;
 
   word-break: break-all;
