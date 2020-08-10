@@ -226,10 +226,6 @@ app.get('/', async (req, res) => {
       const spotifyPlaylist = spotifyPlaylists.items.find(
         (spotifyPlaylist) => googlePlaylist.title === spotifyPlaylist.name
       );
-      if (spotifyPlaylist) {
-        console.log('Found matching Spotify playlist');
-        console.log(spotifyPlaylist);
-      }
       googlePlaylist.spotifyPlaylist = spotifyPlaylist;
       return googlePlaylist;
     }
@@ -376,11 +372,9 @@ app.get('/playlist/:id', async (req, res) => {
 
 app.post('/playlist/:playlistId/upload', async (req, res) => {
   const playlistId = req.params.playlistId;
-  console.log(`Entered /playlist/${playlistId}/upload`);
 
   // Check for Spotify access tokens
   if (!req.session.tokens) {
-    console.log('No tokens, goto /login');
     // If not, redirect to login to get new tokens
     res.redirect('/login');
     return;
@@ -392,14 +386,6 @@ app.post('/playlist/:playlistId/upload', async (req, res) => {
     !req.session.googlePlaylists[playlistId] ||
     !req.session.googlePlaylists[playlistId].spotifyPlaylist
   ) {
-    if (!req.session.googlePlaylists) {
-      console.log('No googlePlaylists, goto /');
-    } else if (!req.session.googlePlaylists[playlistId]) {
-      console.log('No googlePlaylists[playlistId] goto /');
-    } else if (!req.session.googlePlaylists[playlistId].spotifyPlaylist) {
-      console.log('No spotifyPlaylist goto /');
-    }
-
     // If not, redirect back to the root route
     res.redirect(`/`);
     return;
@@ -418,11 +404,6 @@ app.post('/playlist/:playlistId/upload', async (req, res) => {
     })
     // Filter out any null tracks
     .filter((track) => track !== null);
-
-  console.log(
-    `Adding the following tracks to Spotify playlist ${spotifyPlaylistId}`
-  );
-  console.log(spotifyTrackUris);
 
   const updatedPlaylist = await postSpotifyData(
     `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}/tracks`,
@@ -1183,7 +1164,7 @@ app.listen(port, () =>
 
 const getSpotifyData = async (apiEndpoint, tokens, params) => {
   try {
-    console.log(`Sending GET request to ${apiEndpoint}`);
+    // console.log(`Sending GET request to ${apiEndpoint}`);
     const paramsData = params ? params : {};
     const resp = await axios({
       method: 'get',
@@ -1203,7 +1184,7 @@ const getSpotifyData = async (apiEndpoint, tokens, params) => {
 
 const postSpotifyData = async (apiEndpoint, tokens, bodyData) => {
   try {
-    console.log(`Sending POST request to ${apiEndpoint}`);
+    // console.log(`Sending POST request to ${apiEndpoint}`);
     const resp = await axios({
       method: 'post',
       url: apiEndpoint,
