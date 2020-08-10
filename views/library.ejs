@@ -7,7 +7,7 @@
     <div class="column-heading">Spotify Playlist</div>
   </div>
     <% googlePlaylists.forEach((googlePlaylist, googlePlaylistId) => { %>
-      <div class="library-row library-entry">
+      <div class="library-row library-entry" id="playlist-<%=googlePlaylistId%>">
         <div class="library-playlist">
           <div class="library-playlist-title"><%=googlePlaylist.title%></div>
           <div class="library-playlist-description"><%=googlePlaylist.description%></div>

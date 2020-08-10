@@ -218,6 +218,22 @@ app.get('/', async (req, res) => {
   );
 
   // Map the Spotify playlists onto the Google playlists
+  // NOTE: This doesn't work as well mapping a Google id onto a Spotify
+  //       item since the Google playlist ID is based on its index into
+  //       the array. This can change if a playlist is deleted from the array.
+  req.session.googlePlaylists = req.session.googlePlaylists.map(
+    (googlePlaylist) => {
+      const spotifyPlaylist = spotifyPlaylists.items.find(
+        (spotifyPlaylist) => googlePlaylist.title === spotifyPlaylist.name
+      );
+      if (spotifyPlaylist) {
+        console.log('Found matching Spotify playlist');
+        console.log(spotifyPlaylist);
+      }
+      googlePlaylist.spotifyPlaylist = spotifyPlaylist;
+      return googlePlaylist;
+    }
+  );
   req.session.spotifyPlaylists = spotifyPlaylists.items.map(
     (spotifyPlaylist) => {
       const googlePlaylistId = req.session.googlePlaylists.findIndex(
@@ -266,6 +282,7 @@ app.post('/playlist/add', async (req, res) => {
       description: playlist.description
     }
   );
+  req.session.googlePlaylists[playlist.id].spotifyPlaylist = createdPlaylist;
   createdPlaylist.googlePlaylistId = playlist.id;
   req.session.spotifyPlaylists.push(createdPlaylist);
 
@@ -357,6 +374,65 @@ app.get('/playlist/:id', async (req, res) => {
   });
 });
 
+app.post('/playlist/:playlistId/upload', async (req, res) => {
+  const playlistId = req.params.playlistId;
+  console.log(`Entered /playlist/${playlistId}/upload`);
+
+  // Check for Spotify access tokens
+  if (!req.session.tokens) {
+    console.log('No tokens, goto /login');
+    // If not, redirect to login to get new tokens
+    res.redirect('/login');
+    return;
+  }
+
+  // Check for Google playlists and if this playlist exists and if this playlist has an associated Spotify playlist
+  if (
+    !req.session.googlePlaylists ||
+    !req.session.googlePlaylists[playlistId] ||
+    !req.session.googlePlaylists[playlistId].spotifyPlaylist
+  ) {
+    if (!req.session.googlePlaylists) {
+      console.log('No googlePlaylists, goto /');
+    } else if (!req.session.googlePlaylists[playlistId]) {
+      console.log('No googlePlaylists[playlistId] goto /');
+    } else if (!req.session.googlePlaylists[playlistId].spotifyPlaylist) {
+      console.log('No spotifyPlaylist goto /');
+    }
+
+    // If not, redirect back to the root route
+    res.redirect(`/`);
+    return;
+  }
+
+  // Get the Spotify playlist ID to be updated and track URIs to add
+  const spotifyPlaylistId =
+    req.session.googlePlaylists[playlistId].spotifyPlaylist.id;
+  const spotifyTrackUris = req.session.googlePlaylists[playlistId].tracks
+    // Map each google track to its Spotify URI
+    .map((track) => {
+      if (track.spotifyTrack) {
+        return track.spotifyTrack.uri;
+      }
+      return null;
+    })
+    // Filter out any null tracks
+    .filter((track) => track !== null);
+
+  console.log(
+    `Adding the following tracks to Spotify playlist ${spotifyPlaylistId}`
+  );
+  console.log(spotifyTrackUris);
+
+  const updatedPlaylist = await postSpotifyData(
+    `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}/tracks`,
+    req.session.tokens,
+    { uris: spotifyTrackUris }
+  );
+
+  res.redirect('/');
+});
+
 app.post('/playlist/:playlistId/delete', async (req, res) => {
   const playlistId = req.params.playlistId;
 
@@ -373,7 +449,7 @@ app.post('/playlist/:playlistId/delete', async (req, res) => {
     !req.session.googlePlaylists[playlistId]
   ) {
     // If not, redirect back to the root route
-    res.redirect('/');
+    res.redirect(`/`);
     return;
   }
 
@@ -381,7 +457,7 @@ app.post('/playlist/:playlistId/delete', async (req, res) => {
   req.session.googlePlaylists.splice(playlistId, 1);
 
   // Redirect to the root route
-  res.redirect(`/`);
+  res.redirect(`/#playlist-${playlistId}`);
 });
 
 app.post('/playlist/:playlistId/track/:trackId/delete', async (req, res) => {
@@ -419,7 +495,7 @@ app.post('/playlist/:playlistId/track/:trackId/delete', async (req, res) => {
   req.session.googlePlaylists[playlistId].tracks.splice(trackId, 1);
 
   // Redirect to the playlist route
-  res.redirect(`/playlist/${playlistId}`);
+  res.redirect(`/playlist/${playlistId}#result-${trackId}`);
 });
 
 app.post('/playlist/:playlistId/track/:trackId/update', async (req, res) => {
@@ -466,7 +542,7 @@ app.post('/playlist/:playlistId/track/:trackId/update', async (req, res) => {
   ].spotifyTrack = spotifyTrack;
 
   // Redirect to the playlist route
-  res.redirect(`/playlist/${playlistId}`);
+  res.redirect(`/playlist/${playlistId}#result-${trackId}`);
 });
 
 app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
@@ -1127,7 +1203,7 @@ const getSpotifyData = async (apiEndpoint, tokens, params) => {
 
 const postSpotifyData = async (apiEndpoint, tokens, bodyData) => {
   try {
-    console.log(`Sending PUT request to ${apiEndpoint}`);
+    console.log(`Sending POST request to ${apiEndpoint}`);
     const resp = await axios({
       method: 'post',
       url: apiEndpoint,

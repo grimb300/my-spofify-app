@@ -3,7 +3,11 @@
 <h3>Editing Playlist: <%=googlePlaylist.title%></h3>
 <div>
   <a href="/"><button class="header-button">Cancel</button></a>
-  <a href="/playlist/<%=playlistId%>/upload"><button class="header-button">Upload to Spotify</button></a>
+  <div class="header-button">
+    <form action="/playlist/<%=playlistId%>/upload" method="post">
+      <input type="submit" value="Upload to Spotify">
+    </form>
+  </div>
 </div>
 <div class="playlist-wrapper">
   <div class="playlist-row playlist-column-heading">
@@ -12,7 +16,7 @@
     <div class="column-heading">Spotify</div>
   </div>
   <% googlePlaylist.tracks.forEach((googleTrack, trackId) => { %>
-    <div class="playlist-row playlist-entry">
+    <div class="playlist-row playlist-entry" id="result-<%=trackId%>">
       <div class="playlist-track-id"><%=trackId%></div>
       <div class="playlist-track">
         <div class="track-heading">Title</div>
