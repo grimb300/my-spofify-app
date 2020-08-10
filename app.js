@@ -405,11 +405,21 @@ app.post('/playlist/:playlistId/upload', async (req, res) => {
     // Filter out any null tracks
     .filter((track) => track !== null);
 
-  const updatedPlaylist = await postSpotifyData(
-    `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}/tracks`,
-    req.session.tokens,
-    { uris: spotifyTrackUris }
-  );
+  // The Spotify endpoint is limited to 100 tracks added at a time, loop appropriately
+  console.log(`spotifyTrackUris has ${spotifyTrackUris.length} elements`);
+  for (
+    let startIndex = 0;
+    startIndex < spotifyTrackUris.length;
+    startIndex += 100
+  ) {
+    trackSlice = spotifyTrackUris.slice(startIndex, 100);
+    console.log(`Uploading ${trackSlice.length} tracks`);
+    const updatedPlaylist = await postSpotifyData(
+      `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}/tracks`,
+      req.session.tokens,
+      { uris: trackSlice }
+    );
+  }
 
   res.redirect('/');
 });
@@ -1176,9 +1186,27 @@ const getSpotifyData = async (apiEndpoint, tokens, params) => {
       },
       params: paramsData
     });
+    console.log('Request received a normal response');
     return resp.data;
   } catch (err) {
-    console.error(err);
+    if (err.response.status === 429) {
+      console.log(
+        `Received a 429 response with a retry-after of ${err.response.headers[
+          'retry-after'
+        ]}`
+      );
+
+      // Delay 'retry-after' seconds and try again
+      const retryDelay = (delaySeconds) =>
+        new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+      await retryDelay(err.response.headers['retry-after']);
+      console.log('Retrying 429ed request');
+      return await getSpotifyData(apiEndpoint, tokens, params);
+    } else {
+      console.error(err);
+    }
+
+    return err;
   }
 };
 
