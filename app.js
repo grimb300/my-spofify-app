@@ -18,6 +18,8 @@ const fsPromises = fs.promises;
 const csv = require('csv-parser');
 const parse = require('csv-parse/lib/sync');
 
+const { performance } = require('perf_hooks');
+
 const stateKey = 'spotify_auth_state';
 
 // Middleware from Spotify example code (use cors and cookieParser, don't use static)
@@ -311,17 +313,17 @@ app.get('/playlist/:id', async (req, res) => {
     (spotifyPlaylist) => spotifyPlaylist.googlePlaylistId === playlistId
   );
 
-  // Add Spotify tracks to the Google tracks, if necessary
-  googlePlaylist.tracks = await Promise.all(
-    googlePlaylist.tracks.map(async (googleTrack) => {
-      // The mere presence of a 'spotifyTrack' field means don't do anything
-      // if ('spotifyTrack' in Object.keys(googleTrack)) {
-      if (googleTrack.spotifyTrack) {
-        return googleTrack;
-      }
+  console.log(`This playlist has ${googlePlaylist.tracks.length} tracks`);
+  let searchTracks = googlePlaylist.tracks.filter(
+    (track) => !track.spotifyTrack
+  );
+  console.log(`${searchTracks.length} of the tracks need to search Spotify`);
 
+  const startTime = performance.now();
+  searchTracks = await Promise.all(
+    searchTracks.map(async (track) => {
       // Search Spotify based on the Google track info
-      const searchString = `track:${googleTrack.title} artist:${googleTrack.artist} album:${googleTrack.album}`;
+      const searchString = `track:${track.title} artist:${track.artist} album:${track.album}`;
       const searchResults = await getSpotifyData(
         'https://api.spotify.com/v1/search',
         req.session.tokens,
@@ -334,32 +336,83 @@ app.get('/playlist/:id', async (req, res) => {
       // Check the results
       if (searchResults.tracks.total === 0) {
         // If no results, set spotifyTrack to false (so it is definitely falsey)
-        googleTrack.spotifyTrack = false;
+        track.spotifyTrack = false;
       } else if (searchResults.tracks.total === 1) {
         // If only one is returned, the choice is obvious
-        googleTrack.spotifyTrack = searchResults.tracks.items[0];
+        track.spotifyTrack = searchResults.tracks.items[0];
       } else {
         // Find the best fit
         const bestFit = searchResults.tracks.items.find(
           (spotifyTrack) =>
-            spotifyTrack.name === googleTrack.title &&
-            spotifyTrack.artists.includes(googleTrack.artist) &&
-            spotifyTrack.album.name === googleTrack.album
+            spotifyTrack.name === track.title &&
+            spotifyTrack.artists.includes(track.artist) &&
+            spotifyTrack.album.name === track.album
         );
 
         if (bestFit) {
           // If found, update spotifyTrack
-          googleTrack.spotifyTrack = bestFit;
+          track.spotifyTrack = bestFit;
         } else {
           // Otherwise punt and take the first one in the list
-          googleTrack.spotifyTrack = searchResults.tracks.items[0];
+          track.spotifyTrack = searchResults.tracks.items[0];
         }
       }
-
-      // Return the updated googleTrack object
-      return googleTrack;
     })
   );
+
+  console.log(
+    `Search execution took ${(performance.now() - startTime) / 1000} seconds`
+  );
+
+  // // Add Spotify tracks to the Google tracks, if necessary
+  // googlePlaylist.tracks = await Promise.all(
+  //   googlePlaylist.tracks.map(async (googleTrack) => {
+  //     // The mere presence of a 'spotifyTrack' field means don't do anything
+  //     // if ('spotifyTrack' in Object.keys(googleTrack)) {
+  //     if (googleTrack.spotifyTrack) {
+  //       return googleTrack;
+  //     }
+
+  //     // Search Spotify based on the Google track info
+  //     const searchString = `track:${googleTrack.title} artist:${googleTrack.artist} album:${googleTrack.album}`;
+  //     const searchResults = await getSpotifyData(
+  //       'https://api.spotify.com/v1/search',
+  //       req.session.tokens,
+  //       {
+  //         q: searchString,
+  //         type: 'track'
+  //       }
+  //     );
+
+  //     // Check the results
+  //     if (searchResults.tracks.total === 0) {
+  //       // If no results, set spotifyTrack to false (so it is definitely falsey)
+  //       googleTrack.spotifyTrack = false;
+  //     } else if (searchResults.tracks.total === 1) {
+  //       // If only one is returned, the choice is obvious
+  //       googleTrack.spotifyTrack = searchResults.tracks.items[0];
+  //     } else {
+  //       // Find the best fit
+  //       const bestFit = searchResults.tracks.items.find(
+  //         (spotifyTrack) =>
+  //           spotifyTrack.name === googleTrack.title &&
+  //           spotifyTrack.artists.includes(googleTrack.artist) &&
+  //           spotifyTrack.album.name === googleTrack.album
+  //       );
+
+  //       if (bestFit) {
+  //         // If found, update spotifyTrack
+  //         googleTrack.spotifyTrack = bestFit;
+  //       } else {
+  //         // Otherwise punt and take the first one in the list
+  //         googleTrack.spotifyTrack = searchResults.tracks.items[0];
+  //       }
+  //     }
+
+  //     // Return the updated googleTrack object
+  //     return googleTrack;
+  //   })
+  // );
 
   // Render this playlist
   res.render('playlist', {
@@ -406,14 +459,12 @@ app.post('/playlist/:playlistId/upload', async (req, res) => {
     .filter((track) => track !== null);
 
   // The Spotify endpoint is limited to 100 tracks added at a time, loop appropriately
-  console.log(`spotifyTrackUris has ${spotifyTrackUris.length} elements`);
   for (
     let startIndex = 0;
     startIndex < spotifyTrackUris.length;
     startIndex += 100
   ) {
-    trackSlice = spotifyTrackUris.slice(startIndex, 100);
-    console.log(`Uploading ${trackSlice.length} tracks`);
+    trackSlice = spotifyTrackUris.slice(startIndex, startIndex + 100);
     const updatedPlaylist = await postSpotifyData(
       `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}/tracks`,
       req.session.tokens,
@@ -1186,21 +1237,13 @@ const getSpotifyData = async (apiEndpoint, tokens, params) => {
       },
       params: paramsData
     });
-    console.log('Request received a normal response');
     return resp.data;
   } catch (err) {
     if (err.response.status === 429) {
-      console.log(
-        `Received a 429 response with a retry-after of ${err.response.headers[
-          'retry-after'
-        ]}`
-      );
-
       // Delay 'retry-after' seconds and try again
       const retryDelay = (delaySeconds) =>
         new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
       await retryDelay(err.response.headers['retry-after']);
-      console.log('Retrying 429ed request');
       return await getSpotifyData(apiEndpoint, tokens, params);
     } else {
       console.error(err);
