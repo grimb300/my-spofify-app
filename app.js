@@ -313,80 +313,11 @@ app.get('/playlist/:id', async (req, res) => {
     (spotifyPlaylist) => spotifyPlaylist.googlePlaylistId === playlistId
   );
 
-  console.log(`This playlist has ${googlePlaylist.tracks.length} tracks`);
+  // Filter out the tracks that already have a spotifyTrack
+  // No need to search for them again
   let searchTracks = googlePlaylist.tracks.filter(
     (track) => !track.spotifyTrack
   );
-  console.log(`${searchTracks.length} of the tracks need to search Spotify`);
-
-  // // Function to delay a specified number of milliseconds
-  // const createDelay = (delayMS) =>
-  //   new Promise((resolve) => setTimeout(resolve, delayMS));
-
-  // // Number of search requests to make before each delay
-  // const burstLength = 25;
-
-  // // Delay between each burst (in ms)
-  // const burstDelay = 250;
-
-  // // Get current timestamp for perf reasons
-  // const startTime = performance.now();
-
-  // // Iterate across all tracks, one burstLength at a time, delaying burstDelay ms between each burst
-  // for (
-  //   let burstStart = 0;
-  //   burstStart < searchTracks.length;
-  //   burstStart += burstLength
-  // ) {
-  //   // Delay before the next iteration (unless this is the first iteration)
-  //   const delayStart = performance.now();
-  //   await createDelay(burstDelay);
-  //   console.log(`Saw delay of ${performance.now() - delayStart} ms`);
-
-  //   // Get the next burst's tracks
-  //   burstTracks = searchTracks.slice(burstStart, burstStart + burstLength);
-
-  //   // Iterate across the burst tracks
-  //   burstTracks = await Promise.all(
-  //     burstTracks.map(async (track) => {
-  //       // Search Spotify based on the Google track info
-  //       const searchString = `track:${track.title} artist:${track.artist} album:${track.album}`;
-  //       const searchResults = await getSpotifyData(
-  //         'https://api.spotify.com/v1/search',
-  //         req.session.tokens,
-  //         {
-  //           q: searchString,
-  //           type: 'track'
-  //         }
-  //       );
-
-  //       // Check the results
-  //       if (searchResults.tracks.total === 0) {
-  //         // If no results, set spotifyTrack to false (so it is definitely falsey)
-  //         track.spotifyTrack = false;
-  //       } else if (searchResults.tracks.total === 1) {
-  //         // If only one is returned, the choice is obvious
-  //         track.spotifyTrack = searchResults.tracks.items[0];
-  //       } else {
-  //         // Find the best fit
-  //         const bestFit = searchResults.tracks.items.find(
-  //           (spotifyTrack) =>
-  //             spotifyTrack.name === track.title &&
-  //             spotifyTrack.artists.includes(track.artist) &&
-  //             spotifyTrack.album.name === track.album
-  //         );
-
-  //         if (bestFit) {
-  //           // If found, update spotifyTrack
-  //           track.spotifyTrack = bestFit;
-  //         } else {
-  //           // Otherwise punt and take the first one in the list
-  //           track.spotifyTrack = searchResults.tracks.items[0];
-  //         }
-  //       }
-  //     })
-  //   );
-  // }
 
   // Get current timestamp for perf reasons
   const startTime = performance.now();
@@ -429,10 +360,6 @@ app.get('/playlist/:id', async (req, res) => {
         }
       }
     })
-  );
-
-  console.log(
-    `Search execution took ${(performance.now() - startTime) / 1000} seconds`
   );
 
   // // Add Spotify tracks to the Google tracks, if necessary
@@ -1311,11 +1238,6 @@ const getSpotifyData = async (apiEndpoint, tokens, params) => {
     return resp.data;
   } catch (err) {
     if (err.response.status === 429) {
-      console.log(
-        `Saw 429 response with retry-after ${err.response.headers[
-          'retry-after'
-        ]} seconds`
-      );
       // Delay 'retry-after' seconds and try again
       const retryDelay = (delaySeconds) =>
         new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
