@@ -220,32 +220,36 @@ app.get('/', async (req, res) => {
   );
 
   // Map the Spotify playlists onto the Google playlists
-  // NOTE: This doesn't work as well mapping a Google id onto a Spotify
-  //       item since the Google playlist ID is based on its index into
-  //       the array. This can change if a playlist is deleted from the array.
   req.session.googlePlaylists = req.session.googlePlaylists.map(
     (googlePlaylist) => {
-      const spotifyPlaylist = spotifyPlaylists.items.find(
-        (spotifyPlaylist) => googlePlaylist.title === spotifyPlaylist.name
-      );
-      googlePlaylist.spotifyPlaylist = spotifyPlaylist;
+      let updatedSpotifyPlaylist = undefined;
+
+      // If there is already a spotifyPlaylist associated with this googlePlaylist
+      if (googlePlaylist.spotifyPlaylist) {
+        // Find the matching playlist based on Spotify playlist ID
+        updatedSpotifyPlaylist = spotifyPlaylists.items.find(
+          (spotifyPlaylist) =>
+            googlePlaylist.spotifyPlaylist.id === spotifyPlaylist.id
+        );
+      }
+
+      // If the updated Spotify playlist is still undefined
+      if (!updatedSpotifyPlaylist) {
+        // Find the matching playlist based on the playlist title
+        updatedSpotifyPlaylist = spotifyPlaylists.items.find(
+          (spotifyPlaylist) => googlePlaylist.title === spotifyPlaylist.name
+        );
+      }
+
+      // Update the spotifyPlaylist and return
+      googlePlaylist.spotifyPlaylist = updatedSpotifyPlaylist;
       return googlePlaylist;
-    }
-  );
-  req.session.spotifyPlaylists = spotifyPlaylists.items.map(
-    (spotifyPlaylist) => {
-      const googlePlaylistId = req.session.googlePlaylists.findIndex(
-        (googlePlaylist) => googlePlaylist.title === spotifyPlaylist.name
-      );
-      spotifyPlaylist.googlePlaylistId = googlePlaylistId;
-      return spotifyPlaylist;
     }
   );
 
   res.render('library', {
     user: req.session.user,
-    googlePlaylists: req.session.googlePlaylists,
-    spotifyPlaylists: req.session.spotifyPlaylists
+    googlePlaylists: req.session.googlePlaylists
   });
 });
 
@@ -281,8 +285,6 @@ app.post('/playlist/add', async (req, res) => {
     }
   );
   req.session.googlePlaylists[playlist.id].spotifyPlaylist = createdPlaylist;
-  createdPlaylist.googlePlaylistId = playlist.id;
-  req.session.spotifyPlaylists.push(createdPlaylist);
 
   res.redirect(`/playlist/${playlist.id}`);
 });
@@ -307,11 +309,8 @@ app.get('/playlist/:id', async (req, res) => {
     return;
   }
 
-  // Get the Google and Spotify (if present) playlists
+  // Get the Google playlist
   const googlePlaylist = req.session.googlePlaylists[playlistId];
-  const spotifyPlaylist = req.session.spotifyPlaylists.find(
-    (spotifyPlaylist) => spotifyPlaylist.googlePlaylistId === playlistId
-  );
 
   // Filter out the tracks that already have a spotifyTrack
   // No need to search for them again
@@ -362,61 +361,10 @@ app.get('/playlist/:id', async (req, res) => {
     })
   );
 
-  // // Add Spotify tracks to the Google tracks, if necessary
-  // googlePlaylist.tracks = await Promise.all(
-  //   googlePlaylist.tracks.map(async (googleTrack) => {
-  //     // The mere presence of a 'spotifyTrack' field means don't do anything
-  //     // if ('spotifyTrack' in Object.keys(googleTrack)) {
-  //     if (googleTrack.spotifyTrack) {
-  //       return googleTrack;
-  //     }
-
-  //     // Search Spotify based on the Google track info
-  //     const searchString = `track:${googleTrack.title} artist:${googleTrack.artist} album:${googleTrack.album}`;
-  //     const searchResults = await getSpotifyData(
-  //       'https://api.spotify.com/v1/search',
-  //       req.session.tokens,
-  //       {
-  //         q: searchString,
-  //         type: 'track'
-  //       }
-  //     );
-
-  //     // Check the results
-  //     if (searchResults.tracks.total === 0) {
-  //       // If no results, set spotifyTrack to false (so it is definitely falsey)
-  //       googleTrack.spotifyTrack = false;
-  //     } else if (searchResults.tracks.total === 1) {
-  //       // If only one is returned, the choice is obvious
-  //       googleTrack.spotifyTrack = searchResults.tracks.items[0];
-  //     } else {
-  //       // Find the best fit
-  //       const bestFit = searchResults.tracks.items.find(
-  //         (spotifyTrack) =>
-  //           spotifyTrack.name === googleTrack.title &&
-  //           spotifyTrack.artists.includes(googleTrack.artist) &&
-  //           spotifyTrack.album.name === googleTrack.album
-  //       );
-
-  //       if (bestFit) {
-  //         // If found, update spotifyTrack
-  //         googleTrack.spotifyTrack = bestFit;
-  //       } else {
-  //         // Otherwise punt and take the first one in the list
-  //         googleTrack.spotifyTrack = searchResults.tracks.items[0];
-  //       }
-  //     }
-
-  //     // Return the updated googleTrack object
-  //     return googleTrack;
-  //   })
-  // );
-
   // Render this playlist
   res.render('playlist', {
     user: req.session.user,
     googlePlaylist: googlePlaylist,
-    spotifyPlaylist: spotifyPlaylist,
     playlistId: playlistId
   });
 });
@@ -785,405 +733,6 @@ app.get('/playlists', (req, res) => {
     })();
   }
 });
-
-// Individual Spotify playlist route
-app.get('/spotify_playlists/:id', (req, res) => {
-  playlistId = req.params.id;
-
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // Redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
-
-  // Check to see if we have a token
-  if (req.session.access_token) {
-    // Get the tracklist for this playlist
-    (async () => {
-      const tracksData = await getSpotifyData(
-        `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
-        {
-          access: req.session.access_token,
-          refresh: req.session.refresh_token
-        }
-      );
-
-      // Render the tracklist page
-      res.render('tracklist', {
-        user: req.session.user,
-        tracklist: tracksData.items
-      });
-    })();
-  }
-});
-
-app.get('/search', (req, res) => {
-  // Check to see if we have a token
-  if (req.session.access_token) {
-    // Get the search results
-    (async () => {
-      const searchResults = await getSpotifyData(
-        'https://api.spotify.com/v1/search?q=boulevard%20of%20broken%20dreams&type=track',
-        {
-          access: req.session.access_token,
-          refresh: req.session.refresh_token
-        }
-      );
-
-      // Render the search results page
-      res.render('search_results', {
-        tracklist: searchResults.tracks.items
-      });
-    })();
-  }
-});
-
-app.get('/create_playlist', (req, res) => {
-  // Check to see if we have a token
-  if (req.session.access_token) {
-    // Get the search results
-    (async () => {
-      const searchResults = await postSpotifyData(
-        `https://api.spotify.com/v1/users/${req.session.user.id}/playlists`,
-        {
-          name: 'Created Playlist'
-        },
-        {
-          access: req.session.access_token,
-          refresh: req.session.refresh_token
-        }
-      );
-
-      // Render the search results page
-      res.render('search_results', {
-        tracklist: searchResults.tracks.items
-      });
-    })();
-  }
-});
-
-app.get('/google_playlists', async (req, res) => {
-  // If we already have the top level playlist data, no need to import it again
-  if (!req.session.googlePlaylists) {
-    // Read in the playlist.csv file
-    const rawPlaylistsCSV = [];
-    let googlePlaylists = [];
-    fs
-      .createReadStream(`./playlistCSVs/playlists.csv`)
-      .pipe(csv())
-      .on('data', (row) => {
-        rawPlaylistsCSV.push(row);
-      })
-      .on('end', async () => {
-        // Clean up the title and description and add a directory field
-        googlePlaylists = rawPlaylistsCSV.map((playlist) => {
-          // The directory turns apostrophes(' or &#39;) into underscores(_)
-          // and forward slashes(/) into dashes(-)
-          playlist.Directory = playlist.Title
-            .replace(/&#39;/g, '_')
-            .replace(/\//g, '-');
-          // Use fromCharCode to get the actual character
-          playlist.Title = playlist.Title.replace(/&#([0-9]+);/g, (match, p1) =>
-            String.fromCharCode(p1)
-          );
-          playlist.Description = playlist.Description.replace(
-            /&#([0-9]+);/g,
-            (match, p1) => String.fromCharCode(p1)
-          );
-          return playlist;
-        });
-
-        // Read in the contents of the playlistCSVs
-        const dirContents = await fs.promises.readdir('./playlistCSVs', {
-          encoding: 'utf8',
-          withFileTypes: true
-        });
-        // Iterate over the directory contents,
-        // filtering out anything that isn't a directory and
-        // adding missing directories to the googlePlaylists structure
-        dirContents.forEach((element) => {
-          if (element.isDirectory()) {
-            const directoryName = element.name;
-            const matchingPlaylist = googlePlaylists.find((playlist) => {
-              return playlist.Directory === directoryName;
-            });
-            if (matchingPlaylist === undefined) {
-              googlePlaylists.push({
-                Title: directoryName,
-                Owner: 'Bob Grim',
-                Description: '',
-                Shared: '',
-                Deleted: '',
-                Directory: directoryName
-              });
-            }
-          }
-        });
-
-        // Add the playlists structure to the session data
-        req.session.googlePlaylists = googlePlaylists;
-        // TODO: Fix async problems which force rendering down each path
-        res.render('google_playlists', { playlists: googlePlaylists });
-      });
-  } else {
-    // TODO: Fix async problems which force rendering down each path
-    res.render('google_playlists', { playlists: req.session.googlePlaylists });
-  }
-});
-
-app.get('/google_playlists/:id', async (req, res) => {
-  const playlistId = req.params.id;
-
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // If not, redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
-
-  // Check for Google playlists and if this playlist exists
-  if (
-    !req.session.googlePlaylists ||
-    !req.session.googlePlaylists[playlistId]
-  ) {
-    // If not, redirect back to the root route
-    res.redirect('/');
-    return;
-  }
-
-  // Get the Spotify tracks for each Google track
-  req.session.googlePlaylists[playlistId].tracks = await Promise.all(
-    req.session.googlePlaylists[playlistId].tracks.map(async (track) => {
-      // If the spotify tracks already exist, return
-      if (track.spotifyTracks) {
-        return track;
-      }
-
-      // Clean up the track/artist/album info to search in Spotify
-      // Removing all parenthetical phrases as they tend to be
-      // featured artists and other info that makes it hard to search
-      const removeParentheticalRegEx = /\(.*\)/g;
-      // const removePunctuationRegEx = /[().!?;:,'"]/g;
-      const removePunctuationRegEx = /[']/g;
-      const cleanGoogleTrack = {
-        title: track.title
-          .replace(removeParentheticalRegEx, '')
-          .replace(removePunctuationRegEx, ''),
-        artist: track.artist
-          .replace(removeParentheticalRegEx, '')
-          .replace(removePunctuationRegEx, ''),
-        album: track.album
-          .replace(removeParentheticalRegEx, '')
-          .replace(removePunctuationRegEx, '')
-        // title: track.title.replace(removeParentheticalRegEx, ''),
-        // artist: track.artist.replace(removeParentheticalRegEx, ''),
-        // album: track.album.replace(removeParentheticalRegEx, '')
-      };
-
-      // Get Spotify search results based on the Google track info
-      const searchString =
-        `track:${cleanGoogleTrack.title} ` +
-        `artist:${cleanGoogleTrack.artist} ` +
-        `album:${cleanGoogleTrack.album}`;
-      const searchResults = await getSpotifyData(
-        'https://api.spotify.com/v1/search',
-        req.session.tokens,
-        {
-          q: searchString,
-          type: 'track'
-        }
-      );
-
-      // Check how many results are returned
-      if (searchResults.tracks.items.length === 0) {
-        // If there are no results, just notify for now
-      } else if (searchResults.tracks.items.length === 1) {
-        // If there is only one result it has to be the chosen one
-        searchResults.tracks.items[0].chosen = true;
-      } else {
-        // There are multiple results, choose the best fit
-        let bestIndex = searchResults.tracks.items.find(
-          (track) =>
-            track.name === cleanGoogleTrack.title &&
-            track.artists.includes(cleanGoogleTrack.artist) &&
-            track.album.name === cleanGoogleTrack.album
-        );
-        if (bestIndex === -1) {
-          // Pick index 0 because I don't know any better
-          bestIndex = 0;
-        }
-        searchResults.tracks.items[0].chosen = true;
-      }
-
-      // Return the track with the search results
-      track.spotifyTracks = searchResults.tracks.items;
-      return track;
-    })
-  );
-
-  // Render this playlist
-  res.render('google_tracklist', {
-    playlists: req.session.googlePlaylists,
-    playlistId: playlistId
-  });
-});
-
-app.get('/google_playlists/:playlistId/track/:trackId', async (req, res) => {
-  const playlistId = req.params.playlistId;
-  const trackId = req.params.trackId;
-
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // If not, redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
-
-  // Check for Google playlists and if this playlist and track exists
-  if (
-    !req.session.googlePlaylists ||
-    !req.session.googlePlaylists[playlistId] ||
-    !req.session.googlePlaylists[playlistId].tracks[trackId]
-  ) {
-    // If not, redirect to the root route
-    res.redirect('/');
-    return;
-  }
-
-  // If the user has provided search terms, search now
-  const searchString = [
-    req.query.track ? `track:${req.query.track}` : '',
-    req.query.artist ? `artist:${req.query.artist}` : '',
-    req.query.album ? `album:${req.query.album}` : ''
-  ]
-    .filter((element) => element !== '')
-    .join(' ');
-  let searchResults = [];
-  if (searchString !== '') {
-    const spotifySearchResults = await getSpotifyData(
-      'https://api.spotify.com/v1/search',
-      req.session.tokens,
-      {
-        q: searchString,
-        type: 'track'
-      }
-    );
-    searchResults = spotifySearchResults.tracks.items;
-  }
-  req.session.googlePlaylists[playlistId].tracks[
-    trackId
-  ].spotifySearchString = searchString;
-  req.session.googlePlaylists[playlistId].tracks[
-    trackId
-  ].spotifySearchResults = searchResults;
-
-  // Render the page
-  res.render('google_single_track', {
-    playlists: req.session.googlePlaylists,
-    playlistId: playlistId,
-    trackId: trackId
-  });
-});
-
-app.get(
-  '/google_playlists/:playlistId/track/:trackId/pick_me/:spotifyTrackId',
-  (req, res) => {
-    const playlistId = req.params.playlistId;
-    const trackId = req.params.trackId;
-    const newSpotifyTrackId = req.params.spotifyTrackId;
-
-    // Check that all IDs are valid
-    if (
-      !req.session.googlePlaylists ||
-      !req.session.googlePlaylists[playlistId]
-    ) {
-      // If the playlist isn't valid, redirect to root route
-      res.redirect('/');
-      return;
-    } else if (!req.session.googlePlaylists[playlistId].tracks[trackId]) {
-      // If the track list isn't valid, redirect to playlist route
-      res.redirect(`/google_playlists/${playlistId}`);
-      return;
-    } else if (
-      !req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks[
-        newSpotifyTrackId
-      ]
-    ) {
-      // If the Spotify track isn't valid, redirect to track route
-      res.redirect(`/google_playlists/${playlistId}/track/${trackId}`);
-      return;
-    }
-
-    // Change which Spotify track is the chosen one
-    const oldSpotifyTrackId = req.session.googlePlaylists[playlistId].tracks[
-      trackId
-    ].spotifyTracks.findIndex((spotifyTrack) => {
-      return spotifyTrack.chosen;
-    });
-    req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks[
-      oldSpotifyTrackId
-    ].chosen = false;
-    req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks[
-      newSpotifyTrackId
-    ].chosen = true;
-
-    // Redirect to the playlist route
-    res.redirect(`/google_playlists/${playlistId}`);
-  }
-);
-
-app.get(
-  '/google_playlists/:playlistId/track/:trackId/pick_search_result/:spotifyTrackId',
-  (req, res) => {
-    const playlistId = req.params.playlistId;
-    const trackId = req.params.trackId;
-    const newSpotifyTrackId = req.params.spotifyTrackId;
-
-    // Check that all IDs are valid
-    if (
-      !req.session.googlePlaylists ||
-      !req.session.googlePlaylists[playlistId]
-    ) {
-      // If the playlist isn't valid, redirect to root route
-      res.redirect('/');
-      return;
-    } else if (!req.session.googlePlaylists[playlistId].tracks[trackId]) {
-      // If the track list isn't valid, redirect to playlist route
-      res.redirect(`/google_playlists/${playlistId}`);
-      return;
-    } else if (
-      !req.session.googlePlaylists[playlistId].tracks[trackId]
-        .spotifySearchResults[newSpotifyTrackId]
-    ) {
-      // If the Spotify track isn't valid, redirect to track route
-      res.redirect(`/google_playlists/${playlistId}/track/${trackId}`);
-      return;
-    }
-
-    // Change which Spotify track is the chosen one
-    const oldSpotifyTrackId = req.session.googlePlaylists[playlistId].tracks[
-      trackId
-    ].spotifyTracks.findIndex((spotifyTrack) => {
-      return spotifyTrack.chosen;
-    });
-    req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks[
-      oldSpotifyTrackId
-    ].chosen = false;
-    req.session.googlePlaylists[playlistId].tracks[
-      trackId
-    ].spotifySearchResults[newSpotifyTrackId].chosen = true;
-
-    // Last step that is unique to this route is to copy the chosen search result to the spotifyTracks array
-    req.session.googlePlaylists[playlistId].tracks[trackId].spotifyTracks.push(
-      req.session.googlePlaylists[playlistId].tracks[trackId]
-        .spotifySearchResults[newSpotifyTrackId]
-    );
-
-    // Redirect to the playlist route
-    res.redirect(`/google_playlists/${playlistId}`);
-  }
-);
 
 // Refresh Token route, from Spotify example code
 app.get('/refresh_token', (req, res) => {
