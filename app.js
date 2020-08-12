@@ -20,6 +20,9 @@ const parse = require('csv-parse/lib/sync');
 
 const { performance } = require('perf_hooks');
 
+// For uploading the Google zip file
+const formidable = require('formidable');
+
 const stateKey = 'spotify_auth_state';
 
 // Middleware from Spotify example code (use cors and cookieParser, don't use static)
@@ -732,6 +735,32 @@ app.get('/playlists', (req, res) => {
       });
     })();
   }
+});
+
+// Trying to upload a zip file containing the Google playlists CSVs
+app.get('/googleuploader', (req, res) => {
+  res.render('googleuploader', {
+    user: {
+      display_name: 'Bob',
+      images: [ { url: '' } ]
+    }
+  });
+});
+app.post('/googleuploader', (req, res) => {
+  const form = new formidable.IncomingForm();
+  form.parse(req, (err, fields, files) => {
+    console.log('Uploading file...');
+    console.log(err);
+    console.log(fields);
+    console.log(files);
+  });
+
+  res.render('googleuploader', {
+    user: {
+      display_name: 'Bob',
+      images: [ { url: '' } ]
+    }
+  });
 });
 
 // Refresh Token route, from Spotify example code
