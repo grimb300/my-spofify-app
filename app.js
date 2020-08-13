@@ -803,34 +803,73 @@ app.post('/googleuploader', (req, res) => {
       );
 
       // Parse the track CSVs for each playlist
-      googlePlaylists = googlePlaylists.map((playlist) => {
-        console.log(`Working on tracks in ${playlist.directory}`);
-        // Parse the playlist CSVs for this playlist
-        let googleTracks = entries
-          // Track CSVs all have different names, but live in the playlist directory
-          .filter((entry) => entry.name.startsWith(playlist.directory))
-          // Unzip the CSV file to a string
-          .map((csv) => {
-            return {
-              data: zip.entryDataSync(csv).toString('utf8')
-            };
-          })
-          // Parse the CSV string
-          .map((csv) => {
-            // NOTE: parse return an array of objects, there should be only one
-            csv.parsed = parse(csv.data, {
-              columns: true,
-              skip_empty_lines: true
-            })[0];
-            return csv;
-          })
-          // Filter out the deleted tracks
-          .filter((csv) => csv.parsed.Removed !== 'Yes');
-        if (playlist.parsed.Title === '100 Fave Songs 2013') {
-          console.log(googleTracks);
-        }
-      });
-      // console.log(googlePlaylists);
+      googlePlaylists = googlePlaylists
+        .map((playlist) => {
+          // console.log(`Working on tracks in ${playlist.directory}`);
+          // Parse the playlist CSVs for this playlist
+          let googleTracks = entries
+            // Track CSVs all have different names, but live in the playlist directory
+            .filter((entry) => entry.name.startsWith(playlist.directory))
+            // Unzip the CSV file to a string
+            .map((csv) => {
+              return {
+                data: zip.entryDataSync(csv).toString('utf8')
+              };
+            })
+            // Parse the CSV string
+            .map((csv) => {
+              // NOTE: parse return an array of objects, there should be only one
+              csv.parsed = parse(csv.data, {
+                columns: true,
+                skip_empty_lines: true
+              })[0];
+              return csv;
+            })
+            // Filter out the deleted tracks
+            .filter((csv) => csv.parsed.Removed !== 'Yes')
+            // Sort the tracks on 'Playlist Index'
+            .sort(
+              (a, b) =>
+                parseInt(a.parsed['Playlist Index']) -
+                parseInt(b.parsed['Playlist Index'])
+            )
+            // Finally clean up the track object for consumption by the rest of the app
+            .map((track) => {
+              return {
+                name: track.parsed.Title.replace(cleanHtmlRegEx, cleanHtmlFunc),
+                album: track.parsed.Album.replace(
+                  cleanHtmlRegEx,
+                  cleanHtmlFunc
+                ),
+                artist: track.parsed.Artist.replace(
+                  cleanHtmlRegEx,
+                  cleanHtmlFunc
+                ),
+                playlistIndex: parseInt(track.parsed['Playlist Index'])
+              };
+            });
+
+          // Add the track list to the playlist object
+          playlist.googleTracks = googleTracks;
+          return playlist;
+        })
+        // Finally clean up the playlist object for consumption by the rest of the app
+        .map((playlist) => {
+          console.log(playlist);
+          return {
+            name: playlist.parsed.Title.replace(cleanHtmlRegEx, cleanHtmlFunc),
+            description: playlist.parsed.Description.replace(
+              cleanHtmlRegEx,
+              cleanHtmlFunc
+            ),
+            googleTracks: playlist.googleTracks
+          };
+        });
+      console.log(
+        googlePlaylists.find(
+          (playlist) => playlist.name === 'Google Music - Tracks'
+        )
+      );
       //   // console.log(`Working on playlist ${playlistEntry.name}`);
       //   // Unzip the CSV file to a string
       //   const rawData = zip.entryDataSync(playlistEntry).toString('utf8');
@@ -1050,16 +1089,20 @@ const postSpotifyData = async (apiEndpoint, tokens, bodyData) => {
 
 // Clean up HTML special entities
 const cleanHtmlRegEx = /&(#([0-9]+)|([a-z]+));/g;
+const specialEntities = {
+  amp: '&',
+  quot: '"',
+  lt: '<',
+  gt: '>'
+};
 const cleanHtmlFunc = (match, p1, p2, p3) => {
   // It is a decimal unicode value if p2 is defined
   if (p2) {
     return String.fromCharCode(p2);
   } else if (p3) {
     // HTML 4 special entities
-    if (p3 === 'amp') {
-      return '&';
-    } else if (p3 === 'quot') {
-      return '"';
+    if (specialEntities[p3]) {
+      return specialEntities[p3];
     }
   }
   console.log(`ERROR: Don't know how to clean up ${match}`);
