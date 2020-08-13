@@ -20,8 +20,9 @@ const parse = require('csv-parse/lib/sync');
 
 const { performance } = require('perf_hooks');
 
-// For uploading the Google zip file
+// For uploading and unzipping the Google zip file
 const formidable = require('formidable');
+const StreamZip = require('node-stream-zip');
 
 const stateKey = 'spotify_auth_state';
 
@@ -91,23 +92,23 @@ app.get('/', async (req, res) => {
     // Create an empty array for the playlist
     req.session.googlePlaylists = [];
 
-    // Clean up HTML special entities
-    const cleanHtmlRegEx = /&(#([0-9]+)|([a-z]+));/g;
-    const cleanHtmlFunc = (match, p1, p2, p3) => {
-      // It is a decimal unicode value if p2 is defined
-      if (p2) {
-        return String.fromCharCode(p2);
-      } else if (p3) {
-        // HTML 4 special entities
-        if (p3 === 'amp') {
-          return '&';
-        } else if (p3 === 'quot') {
-          return '"';
-        }
-      }
-      console.log(`ERROR: Don't know how to clean up ${match}`);
-      return match;
-    };
+    // // Clean up HTML special entities
+    // const cleanHtmlRegEx = /&(#([0-9]+)|([a-z]+));/g;
+    // const cleanHtmlFunc = (match, p1, p2, p3) => {
+    //   // It is a decimal unicode value if p2 is defined
+    //   if (p2) {
+    //     return String.fromCharCode(p2);
+    //   } else if (p3) {
+    //     // HTML 4 special entities
+    //     if (p3 === 'amp') {
+    //       return '&';
+    //     } else if (p3 === 'quot') {
+    //       return '"';
+    //     }
+    //   }
+    //   console.log(`ERROR: Don't know how to clean up ${match}`);
+    //   return match;
+    // };
 
     // Read in the playlists.csv file
     const playlistsDir = './playlistCSVs';
@@ -747,12 +748,211 @@ app.get('/googleuploader', (req, res) => {
   });
 });
 app.post('/googleuploader', (req, res) => {
+  // Unzip and parse the uploaded file
   const form = new formidable.IncomingForm();
-  form.parse(req, (err, fields, files) => {
-    console.log('Uploading file...');
-    console.log(err);
-    console.log(fields);
-    console.log(files);
+  form.parse(req, async (err, fields, files) => {
+    // Unzip the uploaded file directly from the tmp directory
+    const zip = new StreamZip({
+      file: files.filetoupload.path,
+      storeEntries: true
+    });
+    zip.on('error', (err) => console.error(err));
+    zip.on('ready', () => {
+      // Array of all files in the zip archive
+      const entries = Object.values(zip.entries());
+
+      // Parse the playlist CSVs
+      let googlePlaylists = entries
+        // Playlist CSVs are all the same filename (different directories, of course)
+        .filter((entry) => entry.name.endsWith('Metadata.csv'))
+        // Unzip the CSV file to a string
+        .map((csv) => {
+          return {
+            data: zip.entryDataSync(csv).toString('utf8'),
+            directory: csv.name.replace(/Metadata.csv$/, 'Tracks')
+          };
+        })
+        // Parse the CSV string
+        .map((csv) => {
+          // NOTE: parse returns an array of objects, there should only be one
+          csv.parsed = parse(csv.data, {
+            columns: true,
+            skip_empty_lines: true
+          })[0];
+          return csv;
+        })
+        // Filter out the deleted playlists
+        .filter((csv) => csv.parsed.Deleted !== 'Yes');
+
+      // There are two directories with tracks that don't follow the above paradigm, add them manually here
+      googlePlaylists.push(
+        {
+          directory: 'Takeout/Google Play Music/Playlists/Thumbs Up',
+          parsed: {
+            Title: 'Google Music - Thumbs Up',
+            Description: 'Tracks which were given a Thumbs Up in Google Music'
+          }
+        },
+        {
+          directory: 'Takeout/Google Play Music/Tracks',
+          parsed: {
+            Title: 'Google Music - Tracks',
+            Description: 'Tracks from the Google Music library'
+          }
+        }
+      );
+
+      // Parse the track CSVs for each playlist
+      googlePlaylists = googlePlaylists.map((playlist) => {
+        console.log(`Working on tracks in ${playlist.directory}`);
+        // Parse the playlist CSVs for this playlist
+        let googleTracks = entries
+          // Track CSVs all have different names, but live in the playlist directory
+          .filter((entry) => entry.name.startsWith(playlist.directory))
+          // Unzip the CSV file to a string
+          .map((csv) => {
+            return {
+              data: zip.entryDataSync(csv).toString('utf8')
+            };
+          })
+          // Parse the CSV string
+          .map((csv) => {
+            // NOTE: parse return an array of objects, there should be only one
+            csv.parsed = parse(csv.data, {
+              columns: true,
+              skip_empty_lines: true
+            })[0];
+            return csv;
+          })
+          // Filter out the deleted tracks
+          .filter((csv) => csv.parsed.Removed !== 'Yes');
+        if (playlist.parsed.Title === '100 Fave Songs 2013') {
+          console.log(googleTracks);
+        }
+      });
+      // console.log(googlePlaylists);
+      //   // console.log(`Working on playlist ${playlistEntry.name}`);
+      //   // Unzip the CSV file to a string
+      //   const rawData = zip.entryDataSync(playlistEntry).toString('utf8');
+
+      //   // Parse the CSV string
+      //   // NOTE: parse returns an array of objects, there should only be one so rawObject is the first one
+      //   const rawObject = parse(rawData, {
+      //     columns: true,
+      //     skip_empty_lines: true
+      //   })[0];
+
+      //   // Clean up the raw object to something more usable
+      //   const playlist = {
+      //     name: rawObject.Title.replace(cleanHtmlRegEx, cleanHtmlFunc),
+      //     description: rawObject.Description.replace(
+      //       cleanHtmlRegEx,
+      //       cleanHtmlFunc
+      //     ),
+      //     tracks: []
+      //   };
+
+      //   // Parse the track CSVs for this playlist
+      //   const playlistDirectory = playlistEntry.name.replace(
+      //     /Metadata.csv$/,
+      //     ''
+      //   );
+      //   // console.log(`Looking for tracks in ${playlistDirectory}:`);
+      //   const googleTracks = entries
+      //     .filter((entry) =>
+      //       entry.name.includes(`${playlistDirectory}Tracks`)
+      //     )
+      //     .map((trackEntry) => {
+      //       // console.log(trackEntry.name);
+      //       // Unzip the CSV file to a string
+      //       const rawData = zip.entryDataSync(trackEntry).toString('utf8');
+
+      //       // Parse the CSV string
+      //       // NOTE: parse returns an array of objects, there should only be one so rawObject is the first one
+      //       const rawObject = parse(rawData, {
+      //         columns: true,
+      //         skip_empty_lines: true
+      //       })[0];
+
+      //   // Clean up the raw object to something more usable
+      //   const track = {
+      //     name: rawObject.Title.replace(cleanHtmlRegEx, cleanHtmlFunc),
+      //     description: rawObject.Description.replace(
+      //       cleanHtmlRegEx,
+      //       cleanHtmlFunc
+      //     ),
+      //     tracks: []
+      //   };
+
+      //     });
+
+      //   return playlist;
+      // });
+      // console.log(googlePlaylists);
+      // console.log(`Found ${googlePlaylists.length} playlists:`);
+      // console.log(googlePlaylists.map((playlist) => playlist.name));
+      // googlePlaylists.forEach((entry) => {
+      //   const playlistData = zip.entryDataSync(entry).toString('utf8');
+      //   const playlistObject = parse(playlistData, {
+      //     columns: true,
+      //     on_record: (playlist) => {
+      //       // If deleted, return null
+      //       if (playlist.Deleted === 'Yes') return null;
+
+      //       // Clean up the Title and Description text
+      //       const title = playlist.Title.replace(cleanHtmlRegEx, cleanHtmlFunc);
+      //       const description = playlist.Description.replace(
+      //         cleanHtmlRegEx,
+      //         cleanHtmlFunc
+      //       );
+
+      //       // Return the modified record
+      //       return {
+      //         title: title,
+      //         description: description,
+      //         // Create an empty array for the tracks
+      //         tracks: []
+      //       };
+      //     },
+      //     skip_empty_lines: true
+      //   });
+      //   console.log(playlistObject);
+      // });
+      // console.log(`Entries read: ${zip.entriesCount}`);
+      // console.log(zip.entries());
+      // // const entries = Object.values(zip.entries());
+      // // const playlistDirs = entries.filter(
+      // //   (entry) =>
+      // //     entry.isDirectory &&
+      // //     /^Takeout\/Google Play Music\/Playlists\/[\w\s]+$/.test(entry.name)
+      // // );
+      // console.log('Playlist directories');
+      // console.log(playlistDirs);
+      // console.log(zip.entries());
+      // const entry = zip.entry(
+      //   'Takeout/Google Play Music/Playlists/100 Fave Songs 2013/Metadata.csv'
+      // );
+      // console.log(entry);
+      zip.close();
+    });
+    // zip.on('entry', (entry) => {
+    //   console.log(
+    //     `isDirectory (${entry.isDirectory}) is of type ${typeof entry.isDirectory}`
+    //   );
+    //   if (entry.isDirectory) {
+    //     console.log(`Saw directory ${entry.name}`);
+    //   }
+    //   // console.log(entry);
+    // });
+
+    // const oldpath = files.filetoupload.path;
+    // const newpath = `./uploads/${fields.uploaddir}/${files.filetoupload.name}`;
+    // try {
+    //   await fsPromises.rename(oldpath, newpath);
+    //   console.log('File uploaded and moved!');
+    // } catch (err) {
+    //   console.error(err);
+    // }
   });
 
   res.render('googleuploader', {
@@ -846,4 +1046,22 @@ const postSpotifyData = async (apiEndpoint, tokens, bodyData) => {
   } catch (err) {
     console.error(err);
   }
+};
+
+// Clean up HTML special entities
+const cleanHtmlRegEx = /&(#([0-9]+)|([a-z]+));/g;
+const cleanHtmlFunc = (match, p1, p2, p3) => {
+  // It is a decimal unicode value if p2 is defined
+  if (p2) {
+    return String.fromCharCode(p2);
+  } else if (p3) {
+    // HTML 4 special entities
+    if (p3 === 'amp') {
+      return '&';
+    } else if (p3 === 'quot') {
+      return '"';
+    }
+  }
+  console.log(`ERROR: Don't know how to clean up ${match}`);
+  return match;
 };
