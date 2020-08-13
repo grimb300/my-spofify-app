@@ -234,22 +234,12 @@ app.get('/playlist/:playlistId', async (req, res) => {
 
 app.post('/playlist/add', async (req, res) => {
   // Get the particulars for the new Spotify playlist out of the request body
-  const playlist = req.body.playlist;
+  const newPlaylist = req.body.playlist;
 
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // Redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
-
-  // Check for Google playlists
-  if (
-    !req.session.googlePlaylists ||
-    !req.session.googlePlaylists[playlist.id]
-  ) {
-    // If not, redirect back to the root route
-    res.redirect('/');
+  // Check that this playlist exists
+  if (!req.session.googlePlaylists[newPlaylist.id]) {
+    // If not, redirect back to the library
+    res.redirect('/playlist');
     return;
   }
 
@@ -259,13 +249,13 @@ app.post('/playlist/add', async (req, res) => {
     `https://api.spotify.com/v1/users/${userId}/playlists`,
     req.session.tokens,
     {
-      name: playlist.name,
-      description: playlist.description
+      name: newPlaylist.name,
+      description: newPlaylist.description
     }
   );
-  req.session.googlePlaylists[playlist.id].spotifyPlaylist = createdPlaylist;
+  req.session.googlePlaylists[newPlaylist.id].spotifyPlaylist = createdPlaylist;
 
-  res.redirect(`/playlist/${playlist.id}`);
+  res.redirect(`/playlist/${newPlaylist.id}`);
 });
 
 app.post('/playlist/:playlistId/upload', async (req, res) => {

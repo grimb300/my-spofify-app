@@ -32,7 +32,7 @@
           <div class="library-playlist-button">
             <form action="/playlist/add" method="post">
               <input type="hidden" name="playlist[id]" value="<%=googlePlaylistId%>">
-              <input type="hidden" name="playlist[title]" value="<%=googlePlaylist.title%>">
+              <input type="hidden" name="playlist[name]" value="<%=googlePlaylist.name%>">
               <input type="hidden" name="playlist[description]" value="<%=googlePlaylist.description%>">
               <input type="submit" value="Create Playlist">
             </form>
