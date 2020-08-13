@@ -118,7 +118,7 @@ app.get('/', (req, res) => {
 // Playlist Routes
 /////////////////////////////////////////////
 
-// Library (all playlists) - /playlist
+// Library (all playlists) - "/playlist"
 app.get('/playlist', async (req, res) => {
   // Get the user's Spotify playlists
   const spotifyPlaylists = await getSpotifyData(
@@ -161,7 +161,7 @@ app.get('/playlist', async (req, res) => {
   });
 });
 
-// Playlist (single playlist) - /playlist/:playlistId
+// Playlist (single playlist) - "/playlist/:playlistId"
 app.get('/playlist/:playlistId', async (req, res) => {
   const playlistId = req.params.playlistId;
 
@@ -232,6 +232,7 @@ app.get('/playlist/:playlistId', async (req, res) => {
   });
 });
 
+// Add a playlist - "/playlist/add"
 app.post('/playlist/add', async (req, res) => {
   // Get the particulars for the new Spotify playlist out of the request body
   const newPlaylist = req.body.playlist;
@@ -256,6 +257,24 @@ app.post('/playlist/add', async (req, res) => {
   req.session.googlePlaylists[newPlaylist.id].spotifyPlaylist = createdPlaylist;
 
   res.redirect(`/playlist/${newPlaylist.id}`);
+});
+
+// Delete a playlist - "/playlist/:playlistId/delete"
+app.post('/playlist/:playlistId/delete', async (req, res) => {
+  const playlistId = req.params.playlistId;
+
+  // Check that this playlist exists
+  if (!req.session.googlePlaylists[playlistId]) {
+    // If not, redirect back to the library
+    res.redirect('/playlist');
+    return;
+  }
+
+  // Remove the Google playlist from the library
+  req.session.googlePlaylists.splice(playlistId, 1);
+
+  // Redirect to the root route
+  res.redirect(`/#playlist-${playlistId}`);
 });
 
 app.post('/playlist/:playlistId/upload', async (req, res) => {
@@ -308,33 +327,6 @@ app.post('/playlist/:playlistId/upload', async (req, res) => {
   }
 
   res.redirect('/');
-});
-
-app.post('/playlist/:playlistId/delete', async (req, res) => {
-  const playlistId = req.params.playlistId;
-
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // If not, redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
-
-  // Check for Google playlists and if this playlist exists
-  if (
-    !req.session.googlePlaylists ||
-    !req.session.googlePlaylists[playlistId]
-  ) {
-    // If not, redirect back to the root route
-    res.redirect(`/`);
-    return;
-  }
-
-  // Remove the Google playlist from the library
-  req.session.googlePlaylists.splice(playlistId, 1);
-
-  // Redirect to the root route
-  res.redirect(`/#playlist-${playlistId}`);
 });
 
 app.post('/playlist/:playlistId/track/:trackId/delete', async (req, res) => {
