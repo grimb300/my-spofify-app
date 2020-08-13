@@ -118,7 +118,7 @@ app.get('/', (req, res) => {
 // Playlist Routes
 /////////////////////////////////////////////
 
-// Library (all playlists) - "/playlist"
+// View the library (all playlists) - "/playlist"
 app.get('/playlist', async (req, res) => {
   // Get the user's Spotify playlists
   const spotifyPlaylists = await getSpotifyData(
@@ -161,7 +161,7 @@ app.get('/playlist', async (req, res) => {
   });
 });
 
-// Playlist (single playlist) - "/playlist/:playlistId"
+// View a playlist (single playlist) - "/playlist/:playlistId"
 app.get('/playlist/:playlistId', async (req, res) => {
   const playlistId = req.params.playlistId;
 
@@ -277,15 +277,9 @@ app.post('/playlist/:playlistId/delete', async (req, res) => {
   res.redirect(`/#playlist-${playlistId}`);
 });
 
+// Upload a playlist to Spotify - "/playlist/:playlistId/upload"
 app.post('/playlist/:playlistId/upload', async (req, res) => {
   const playlistId = req.params.playlistId;
-
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // If not, redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
 
   // Check that this playlist exists and has an associated Spotify playlist
   if (
@@ -328,124 +322,28 @@ app.post('/playlist/:playlistId/upload', async (req, res) => {
   res.redirect('/playlist');
 });
 
-app.post('/playlist/:playlistId/track/:trackId/delete', async (req, res) => {
-  const playlistId = req.params.playlistId;
-  const trackId = req.params.trackId;
-
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // If not, redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
-
-  // Check for Google playlists and if this playlist exists
-  if (
-    !req.session.googlePlaylists ||
-    !req.session.googlePlaylists[playlistId]
-  ) {
-    // If not, redirect back to the root route
-    res.redirect('/');
-    return;
-  }
-
-  // Check that this track exists
-  if (
-    !req.session.googlePlaylists[playlistId].tracks ||
-    !req.session.googlePlaylists[playlistId].tracks[trackId]
-  ) {
-    // If not, redirect back to the playlist route
-    res.redirect(`/playlist/${playlistId}`);
-    return;
-  }
-
-  // Remove the Google track from the playlist
-  req.session.googlePlaylists[playlistId].tracks.splice(trackId, 1);
-
-  // Redirect to the playlist route
-  res.redirect(`/playlist/${playlistId}#result-${trackId}`);
-});
-
-app.post('/playlist/:playlistId/track/:trackId/update', async (req, res) => {
-  const playlistId = req.params.playlistId;
-  const trackId = req.params.trackId;
-  const spotifyTrackId = req.body.spotifyTrackId;
-
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // If not, redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
-
-  // Check for Google playlists and if this playlist exists
-  if (
-    !req.session.googlePlaylists ||
-    !req.session.googlePlaylists[playlistId]
-  ) {
-    // If not, redirect back to the root route
-    res.redirect('/');
-    return;
-  }
-
-  // Check that this track exists
-  if (
-    !req.session.googlePlaylists[playlistId].tracks ||
-    !req.session.googlePlaylists[playlistId].tracks[trackId]
-  ) {
-    // If not, redirect back to the playlist route
-    res.redirect(`/playlist/${playlistId}`);
-    return;
-  }
-
-  // Get the Spotify track
-  const spotifyTrack = await getSpotifyData(
-    `https://api.spotify.com/v1/tracks/${spotifyTrackId}`,
-    req.session.tokens
-  );
-
-  // Update the Spotify track in the Google track
-  req.session.googlePlaylists[playlistId].tracks[
-    trackId
-  ].spotifyTrack = spotifyTrack;
-
-  // Redirect to the playlist route
-  res.redirect(`/playlist/${playlistId}#result-${trackId}`);
-});
-
+// View a track - "/playlist/:playlistId/track/:trackId"
 app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
   const playlistId = req.params.playlistId;
   const trackId = req.params.trackId;
 
-  // Check for Spotify access tokens
-  if (!req.session.tokens) {
-    // If not, redirect to login to get new tokens
-    res.redirect('/login');
-    return;
-  }
-
-  // Check for Google playlists and if this playlist exists
-  if (
-    !req.session.googlePlaylists ||
-    !req.session.googlePlaylists[playlistId]
-  ) {
-    // If not, redirect back to the root route
-    res.redirect('/');
+  // Check that this playlist exists
+  if (!req.session.googlePlaylists[playlistId]) {
+    // If not, redirect back to the library
+    res.redirect('/playlist');
     return;
   }
 
   // Check that this track exists
-  if (
-    !req.session.googlePlaylists[playlistId].tracks ||
-    !req.session.googlePlaylists[playlistId].tracks[trackId]
-  ) {
+  if (!req.session.googlePlaylists[playlistId].googleTracks[trackId]) {
     // If not, redirect back to the playlist route
     res.redirect(`/playlist/${playlistId}`);
     return;
   }
 
   // Get the Google track
-  const googleTrack = req.session.googlePlaylists[playlistId].tracks[trackId];
+  const googleTrack =
+    req.session.googlePlaylists[playlistId].googleTracks[trackId];
 
   // Create a search based on terms provided in the query
   // If no query, default to a search based on the Google track info
@@ -476,7 +374,7 @@ app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
   // Render track.ejs
   res.render('track', {
     user: req.session.user,
-    googleTrack: req.session.googlePlaylists[playlistId].tracks[trackId],
+    googleTrack: req.session.googlePlaylists[playlistId].googleTracks[trackId],
     playlistId: playlistId,
     trackId: trackId,
     searchTerms: searchTerms,
@@ -484,135 +382,70 @@ app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
   });
 });
 
-// Login route, borrowed from the Spotify example code
-app.get('/login', (req, res) => {
-  const state = generateRandomString(16);
-  req.session[stateKey] = state;
+// Delete a track - "/playlist/:playlistId/track/:trackId/delete"
+app.post('/playlist/:playlistId/track/:trackId/delete', async (req, res) => {
+  const playlistId = req.params.playlistId;
+  const trackId = req.params.trackId;
 
-  // your application requests authorization
-  const scope = [
-    'user-read-private',
-    'user-read-email',
-    'playlist-read-private',
-    'playlist-read-collaborative',
-    'playlist-modify-public',
-    'playlist-modify-private'
-  ].join(' ');
-  res.redirect(
-    'https://accounts.spotify.com/authorize?' +
-      querystring.stringify({
-        response_type: 'code',
-        client_id: client_id,
-        scope: scope,
-        redirect_uri: redirect_uri,
-        state: state
-      })
-  );
-});
-
-// Callback route, borrowed from the Spotify example code
-app.get('/callback', (req, res) => {
-  // Using callback function from: https://github.com/spotify/web-api-auth-examples/issues/55
-
-  const code = req.query.code || null;
-  const state = req.query.state || null;
-  const storedState = req.session[stateKey] ? req.session[stateKey] : null;
-
-  if (state === null || state !== storedState) {
-    // res.redirect(
-    //   '/#' +
-    //     queryString.stringify({
-    //       error: 'state_mismatch'
-    //     })
-    // );
-    res.send(`state (${state}) does not match storedState (${storedState})`);
+  // Check that this playlist exists
+  if (!req.session.googlePlaylists[playlistId]) {
+    // If not, redirect back to the library
+    res.redirect('/playlist');
     return;
   }
 
-  req.session[stateKey] = null;
-
-  axios({
-    url: 'https://accounts.spotify.com/api/token',
-    method: 'post',
-    params: {
-      code: code,
-      redirect_uri: redirect_uri,
-      grant_type: 'authorization_code'
-    },
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    auth: {
-      username: client_id,
-      password: client_secret
-    }
-  })
-    .then(async (response) => {
-      // Add the tokens to the session data
-      req.session.tokens = {
-        access: response.data.access_token,
-        refresh: response.data.refresh_token
-      };
-
-      // Get the user data
-      const userData = await getSpotifyData(
-        'https://api.spotify.com/v1/me',
-        req.session.tokens
-      );
-      req.session.user = userData;
-
-      // Redirect to the root
-      res.redirect('/');
-    })
-    .catch((err) => {
-      console.log(err);
-    });
-});
-
-// User route
-app.get('/user', (req, res) => {
-  // Check to see if we have a token
-  if (req.session.access_token) {
-    // Get the user data
-    (async () => {
-      const userData = await getSpotifyData('https://api.spotify.com/v1/me', {
-        access: req.session.access_token,
-        refresh: req.session.access_token
-      });
-
-      // Save the user data and render the user page
-      req.session.user = userData;
-      res.render('user', { user: userData });
-    })();
-  } else {
-    // If no token, got back to the login screen
-    res.redirect('/login');
+  // Check that this track exists
+  if (!req.session.googlePlaylists[playlistId].googleTracks[trackId]) {
+    // If not, redirect back to the playlist route
+    res.redirect(`/playlist/${playlistId}`);
+    return;
   }
+
+  // Remove the Google track from the playlist
+  req.session.googlePlaylists[playlistId].googleTracks.splice(trackId, 1);
+
+  // Redirect to the playlist route
+  res.redirect(`/playlist/${playlistId}#result-${trackId}`);
 });
 
-// Playlists route
-app.get('/playlists', (req, res) => {
-  // Check to see if we have a token
-  if (req.session.access_token) {
-    // Get the user playlists
-    (async () => {
-      const playlistsData = await getSpotifyData(
-        'https://api.spotify.com/v1/me/playlists',
-        {
-          access: req.session.access_token,
-          refresh: req.session.refresh_token
-        }
-      );
+// Update a track - "/playlist/:playlistId/track/:trackId/update"
+app.post('/playlist/:playlistId/track/:trackId/update', async (req, res) => {
+  const playlistId = req.params.playlistId;
+  const trackId = req.params.trackId;
+  const spotifyTrackId = req.body.spotifyTrackId;
 
-      // Render the library page
-      res.render('library', {
-        user: req.session.user,
-        playlists: playlistsData.items
-      });
-    })();
+  // Check that this playlist exists
+  if (!req.session.googlePlaylists[playlistId]) {
+    // If not, redirect back to the library
+    res.redirect('/playlist');
+    return;
   }
+
+  // Check that this track exists
+  if (!req.session.googlePlaylists[playlistId].googleTracks[trackId]) {
+    // If not, redirect back to the playlist route
+    res.redirect(`/playlist/${playlistId}`);
+    return;
+  }
+
+  // Get the Spotify track
+  const spotifyTrack = await getSpotifyData(
+    `https://api.spotify.com/v1/tracks/${spotifyTrackId}`,
+    req.session.tokens
+  );
+
+  // Update the Spotify track in the Google track
+  req.session.googlePlaylists[playlistId].googleTracks[
+    trackId
+  ].spotifyTrack = spotifyTrack;
+
+  // Redirect to the playlist route
+  res.redirect(`/playlist/${playlistId}#result-${trackId}`);
 });
+
+/////////////////////////////////////////////
+// Google Zip File Uploader Routes
+/////////////////////////////////////////////
 
 // Trying to upload a zip file containing the Google playlists CSVs
 app.get('/zipuploader', (req, res) => {
@@ -749,6 +582,102 @@ app.post('/zipuploader', (req, res) => {
       res.redirect('/playlist');
     });
   });
+});
+
+/////////////////////////////////////////////
+// Spotify Authorization Routes
+/////////////////////////////////////////////
+
+// Login route, borrowed from the Spotify example code
+app.get('/login', (req, res) => {
+  const state = generateRandomString(16);
+  req.session[stateKey] = state;
+
+  // your application requests authorization
+  const scope = [
+    'user-read-private',
+    'user-read-email',
+    'playlist-read-private',
+    'playlist-read-collaborative',
+    'playlist-modify-public',
+    'playlist-modify-private'
+  ].join(' ');
+  res.redirect(
+    'https://accounts.spotify.com/authorize?' +
+      querystring.stringify({
+        response_type: 'code',
+        client_id: client_id,
+        scope: scope,
+        redirect_uri: redirect_uri,
+        state: state
+      })
+  );
+});
+
+// Callback route, borrowed from the Spotify example code
+app.get('/callback', (req, res) => {
+  // Using callback function from: https://github.com/spotify/web-api-auth-examples/issues/55
+
+  const code = req.query.code || null;
+  const state = req.query.state || null;
+  const storedState = req.session[stateKey] ? req.session[stateKey] : null;
+
+  if (state === null || state !== storedState) {
+    // res.redirect(
+    //   '/#' +
+    //     queryString.stringify({
+    //       error: 'state_mismatch'
+    //     })
+    // );
+    res.send(`state (${state}) does not match storedState (${storedState})`);
+    return;
+  }
+
+  req.session[stateKey] = null;
+
+  axios({
+    url: 'https://accounts.spotify.com/api/token',
+    method: 'post',
+    params: {
+      code: code,
+      redirect_uri: redirect_uri,
+      grant_type: 'authorization_code'
+    },
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    auth: {
+      username: client_id,
+      password: client_secret
+    }
+  })
+    .then(async (response) => {
+      // Add the tokens to the session data
+      req.session.tokens = {
+        access: response.data.access_token,
+        refresh: response.data.refresh_token
+      };
+
+      // Get the user data
+      const userData = await getSpotifyData(
+        'https://api.spotify.com/v1/me',
+        req.session.tokens
+      );
+      req.session.user = userData;
+
+      // Redirect to the root
+      res.redirect('/');
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+});
+
+// User route
+app.get('/user', (req, res) => {
+  // Do nothing other than render the user template
+  res.render('user', { user: req.session.user });
 });
 
 // Refresh Token route, from Spotify example code
