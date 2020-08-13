@@ -9,9 +9,9 @@
     <% googlePlaylists.forEach((googlePlaylist, googlePlaylistId) => { %>
       <div class="library-row library-entry" id="playlist-<%=googlePlaylistId%>">
         <div class="library-playlist">
-          <div class="library-playlist-title"><%=googlePlaylist.title%></div>
+          <div class="library-playlist-title"><%=googlePlaylist.name%></div>
           <div class="library-playlist-description"><%=googlePlaylist.description%></div>
-          <div class="library-playlist-num-tracks"><%=googlePlaylist.tracks.length%> tracks</div>
+          <div class="library-playlist-num-tracks"><%=googlePlaylist.googleTracks.length%> tracks</div>
           <div class="library-playlist-button">
             <form action="/playlist/<%=googlePlaylistId%>/delete" method="post">
               <input type="submit" value="Delete Playlist">
