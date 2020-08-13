@@ -287,21 +287,20 @@ app.post('/playlist/:playlistId/upload', async (req, res) => {
     return;
   }
 
-  // Check for Google playlists and if this playlist exists and if this playlist has an associated Spotify playlist
+  // Check that this playlist exists and has an associated Spotify playlist
   if (
-    !req.session.googlePlaylists ||
     !req.session.googlePlaylists[playlistId] ||
     !req.session.googlePlaylists[playlistId].spotifyPlaylist
   ) {
-    // If not, redirect back to the root route
-    res.redirect(`/`);
+    // If not, redirect back to the library
+    res.redirect('/playlist');
     return;
   }
 
   // Get the Spotify playlist ID to be updated and track URIs to add
   const spotifyPlaylistId =
     req.session.googlePlaylists[playlistId].spotifyPlaylist.id;
-  const spotifyTrackUris = req.session.googlePlaylists[playlistId].tracks
+  const spotifyTrackUris = req.session.googlePlaylists[playlistId].googleTracks
     // Map each google track to its Spotify URI
     .map((track) => {
       if (track.spotifyTrack) {
@@ -326,7 +325,7 @@ app.post('/playlist/:playlistId/upload', async (req, res) => {
     );
   }
 
-  res.redirect('/');
+  res.redirect('/playlist');
 });
 
 app.post('/playlist/:playlistId/track/:trackId/delete', async (req, res) => {

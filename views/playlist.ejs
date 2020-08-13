@@ -1,6 +1,6 @@
 <%- include('./partials/header'); %>
 
-<h3>Editing Playlist: <%=googlePlaylist.title%></h3>
+<h3>Editing Playlist: <%=googlePlaylist.name%></h3>
 <div>
   <a href="/"><button class="header-button">Cancel</button></a>
   <div class="header-button">
@@ -20,7 +20,7 @@
       <div class="playlist-track-id"><%=trackId%></div>
       <div class="playlist-track">
         <div class="track-heading">Title</div>
-        <div class="track-data"><%=googleTrack.title%></div>
+        <div class="track-data"><%=googleTrack.name%></div>
         <div class="track-heading">Artist</div>
         <div class="track-data"><%=googleTrack.artist%></div>
         <div class="track-heading">Album</div>
