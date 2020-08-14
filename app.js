@@ -59,7 +59,7 @@ app.set('view engine', 'ejs');
 // Replace the client_secret before productizing
 const client_id = process.env.SPOTIFY_CLIENT_ID; // Your client id
 const client_secret = process.env.SPOTIFY_CLIENT_SECRET; // Your secret
-const redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
+const redirect_uri = process.env.SPOTIFY_REDIRECT_URI; // Your redirect uri
 
 // Helper function from Spotify example code
 /**
