@@ -305,14 +305,23 @@ app.post('/playlist/:playlistId/upload', async (req, res) => {
     // Filter out any null tracks
     .filter((track) => track !== null);
 
-  // The Spotify endpoint is limited to 100 tracks added at a time, loop appropriately
+  // The Spotify endpoint is limited to 100 tracks added at a time
+  // Upload the first 100 tracks, replacing the existing Spotify playlist tracks
+  // NOTE: This uses a PUT request, compared to the later POST requests to append the playlist
+  let trackSlice = spotifyTrackUris.slice(0, 100);
+  await putSpotifyData(
+    `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}/tracks`,
+    req.session.tokens,
+    { uris: trackSlice }
+  );
+  // Now loop across the remaining tracks (100 at a time), appending the slice to the existing playlist
   for (
-    let startIndex = 0;
+    let startIndex = 100;
     startIndex < spotifyTrackUris.length;
     startIndex += 100
   ) {
     trackSlice = spotifyTrackUris.slice(startIndex, startIndex + 100);
-    const updatedPlaylist = await postSpotifyData(
+    await postSpotifyData(
       `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}/tracks`,
       req.session.tokens,
       { uris: trackSlice }
@@ -776,6 +785,26 @@ const postSpotifyData = async (apiEndpoint, tokens, bodyData) => {
     // console.log(`Sending POST request to ${apiEndpoint}`);
     const resp = await axios({
       method: 'post',
+      url: apiEndpoint,
+      data: bodyData,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${tokens.access}`
+      }
+    });
+    return resp.data;
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+// TODO: Refactor to stop repeating myself with each *SpotifyData function
+const putSpotifyData = async (apiEndpoint, tokens, bodyData) => {
+  try {
+    // console.log(`Sending POST request to ${apiEndpoint}`);
+    const resp = await axios({
+      method: 'put',
       url: apiEndpoint,
       data: bodyData,
       headers: {
