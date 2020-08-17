@@ -1,11 +1,16 @@
 <%- include('./partials/header'); %>
 
 <h3>Google Music Zip Uploader</h3>
+<% if (errorMsg) { %>
+  <h4 class="alert"><%=errorMsg%></h4>
+<% } %>
 <form action="zipuploader" method="post" enctype="multipart/form-data">
-  <input type="file" name="filetoupload">
-  <label for="uploaddir">Directory to upload to:</label>
-  <input type="text" name="uploaddir" id="uploaddir">
-  <input type="submit">
+  <div class="header-button">
+    <input type="file" name="filetoupload" id="filetoupload">
+  </div>
+  <div class="header-button">
+    <input type="submit" value="Upload">
+  </div>
 </form>
 
 <%- include('./partials/footer'); %>

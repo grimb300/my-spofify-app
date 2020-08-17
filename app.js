@@ -450,13 +450,38 @@ app.post('/playlist/:playlistId/track/:trackId/update', async (req, res) => {
 // Trying to upload a zip file containing the Google playlists CSVs
 app.get('/zipuploader', (req, res) => {
   res.render('zipuploader', {
-    user: req.session.user
+    user: req.session.user,
+    errorMsg: undefined
   });
 });
 app.post('/zipuploader', (req, res) => {
   // Unzip and parse the uploaded file
   const form = new formidable.IncomingForm();
   form.parse(req, async (err, fields, files) => {
+    // First make sure a file with the expected name ('takeout-*.zip') of the expected type was uploaded
+    errorMsg = undefined;
+    if (!files.filetoupload || !files.filetoupload.name) {
+      errorMsg =
+        'Missing file, please choose a Google Takeout zip file to upload';
+    } else if (
+      !files.filetoupload.name.startsWith('takeout') ||
+      !files.filetoupload.name.endsWith('.zip')
+    ) {
+      errorMsg =
+        'Bad filename, please choose a Google Takeout zip file ("takeout-*.zip") to upload';
+    } else if (files.filetoupload.type !== 'application/x-zip-compressed') {
+      errorMsg =
+        'Bad filetype, please choose a Google Takeout zip file to upload';
+    }
+    if (errorMsg) {
+      // If not, render zipuploader again with an error message
+      res.render('zipuploader', {
+        user: req.session.user,
+        errorMsg: errorMsg
+      });
+      return;
+    }
+
     // Unzip the uploaded file directly from the tmp directory
     const zip = new StreamZip({
       file: files.filetoupload.path,
