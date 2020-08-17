@@ -22,7 +22,13 @@
         <div class="library-playlist">  
           <div class="library-playlist-title"><%=googlePlaylist.spotifyPlaylist.name%></div>
           <div class="library-playlist-description"><%=googlePlaylist.spotifyPlaylist.description%></div>
-          <div class="library-playlist-num-tracks"><%=googlePlaylist.spotifyPlaylist.tracks.total%> tracks</div>
+          <% if (googlePlaylist.googleTracks.length !== googlePlaylist.spotifyPlaylist.tracks.total) { %>
+          <div class="library-playlist-num-tracks caution">
+          <% } else { %>
+          <div class="library-playlist-num-tracks">
+          <% } %>
+            <%=googlePlaylist.spotifyPlaylist.tracks.total%> tracks
+          </div>
           <div class="library-playlist-button"><a href="/playlist/<%=googlePlaylistId%>"><button>Edit Playlist</button></a></div>
         <% } else { %>
         <div class="library-playlist alert">  

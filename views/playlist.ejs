@@ -35,11 +35,30 @@
       <% const spotifyTrack = googleTrack.spotifyTrack; %>
       <div class="playlist-track">
         <div class="track-heading">Title</div>
-        <div class="track-data"><%=spotifyTrack.name%></div>
+        <% if (googleTrack.name !== spotifyTrack.name) { %>
+        <div class="track-data caution">
+        <% } else { %>
+        <div class="track-data">
+        <% } %>
+          <%=spotifyTrack.name%>
+        </div>
         <div class="track-heading">Artist</div>
-        <div class="track-data"><%=spotifyTrack.artists.map((artist) => artist.name).join(', ')%></div>
+        <% const spotifyTrackArtists = spotifyTrack.artists.map((artist) => artist.name).join(', '); %>
+        <% if (googleTrack.artist !== spotifyTrackArtists) { %>
+        <div class="track-data caution">
+        <% } else { %>
+        <div class="track-data">
+        <% } %>
+          <%=spotifyTrackArtists%>
+        </div>
         <div class="track-heading">Album</div>
-        <div class="track-data"><%=spotifyTrack.album.name%></div>
+        <% if (googleTrack.album !== spotifyTrack.album.name) { %>
+        <div class="track-data caution">
+        <% } else { %>
+        <div class="track-data">
+        <% } %>
+          <%=spotifyTrack.album.name%>
+        </div>
         <div class="track-heading">Track No</div>
         <div class="track-data"><%=spotifyTrack.track_number%></div>
       <% } else { %>
