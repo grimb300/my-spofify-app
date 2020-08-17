@@ -16,9 +16,10 @@
     <div class="column-heading">Google</div>
     <div class="column-heading">Spotify</div>
   </div>
-  <% pageTracks.forEach((googleTrack, trackId) => { %>
-    <div class="playlist-row playlist-entry" id="result-<%=trackId%>">
-      <div class="playlist-track-id"><%=trackId + startPageTrackId%></div>
+  <% pageTracks.forEach((googleTrack, pageTrackId) => { %>
+    <% const googleTrackId = pageTrackId + startPageTrackId; %>
+    <div class="playlist-row playlist-entry" id="result-<%=pageTrackId%>">
+      <div class="playlist-track-id"><%=googleTrackId + 1%></div>
       <div class="playlist-track">
         <div class="track-heading">Title</div>
         <div class="track-data"><%=googleTrack.name%></div>
@@ -27,7 +28,7 @@
         <div class="track-heading">Album</div>
         <div class="track-data"><%=googleTrack.album%></div>
         <div class="track-button">
-          <form action="/playlist/<%=playlistId%>/track/<%=trackId%>/delete" method="post">
+          <form action="/playlist/<%=playlistId%>/track/<%=googleTrackId%>/delete" method="post">
             <input type="submit" value="Delete Track">
           </form>
         </div>
@@ -67,7 +68,7 @@
         <div class="track-heading">No matching Spotify track</div>
       <% } %>
         <div class="track-button">
-          <a href="/playlist/<%=playlistId%>/track/<%=trackId%>"><button>Edit Track</button></a>
+          <a href="/playlist/<%=playlistId%>/track/<%=googleTrackId%>"><button>Edit Track</button></a>
         </div>
       </div>
     </div>

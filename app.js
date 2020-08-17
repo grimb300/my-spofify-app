@@ -165,6 +165,7 @@ app.get('/playlist', async (req, res) => {
 app.get('/playlist/:playlistId', async (req, res) => {
   const playlistId = req.params.playlistId;
   let currentPage = req.query.page;
+  let queryTrack = req.query.track;
 
   // Check that this playlist exists
   if (!req.session.googlePlaylists[playlistId]) {
@@ -184,25 +185,38 @@ app.get('/playlist/:playlistId', async (req, res) => {
   const lastPage = totalPages - 1;
   // Do some input validation of the provided page
   // First attempt to turn the query string into an integer
-  console.log(`Start, currentPage = ${currentPage}`);
   currentPage = parseInt(currentPage);
-  console.log(`After parseInt, currentPage = ${currentPage}`);
   // If NaN, default to page 0
   if (isNaN(currentPage)) {
     currentPage = 0;
-    console.log(`After isNaN, currentPage = ${currentPage}`);
   } else {
-    console.log(`After isNaN, currentPage = ${currentPage}`);
     // The page in the query string is 1 based
     // change to 0 based page numbers for the rest of the function
     currentPage = currentPage - 1;
 
     // If page number is negative, default to page 0
     currentPage = currentPage < 0 ? 0 : currentPage;
-    console.log(`After negative check, currentPage = ${currentPage}`);
     // If greater than the last page, default to the last page
     currentPage = currentPage > lastPage ? lastPage : currentPage;
-    console.log(`After overflow check, currentPage = ${currentPage}`);
+  }
+
+  // If a particular track is queried, redirect to that that page/track
+  // Assumes that if both track and page are queried, track wins
+  // Validate the track input
+  queryTrack = parseInt(queryTrack);
+  if (
+    !isNaN(queryTrack) &&
+    queryTrack >= 0 &&
+    queryTrack < googlePlaylist.googleTracks.length
+  ) {
+    // Calculate which page and sliceTrackId this track is for the redirection
+    // Remember pages are 1 based on the query string
+    const trackPage = Math.trunc(queryTrack / tracksPerPage) + 1;
+    const sliceTrackId = queryTrack % tracksPerPage;
+    res.redirect(
+      `/playlist/${playlistId}?page=${trackPage}#result-${sliceTrackId}`
+    );
+    return;
   }
 
   // Get the track range to slice
@@ -451,7 +465,7 @@ app.post('/playlist/:playlistId/track/:trackId/delete', async (req, res) => {
   req.session.googlePlaylists[playlistId].googleTracks.splice(trackId, 1);
 
   // Redirect to the playlist route
-  res.redirect(`/playlist/${playlistId}#result-${trackId}`);
+  res.redirect(`/playlist/${playlistId}?track=${trackId}`);
 });
 
 // Update a track - "/playlist/:playlistId/track/:trackId/update"
@@ -486,7 +500,7 @@ app.post('/playlist/:playlistId/track/:trackId/update', async (req, res) => {
   ].spotifyTrack = spotifyTrack;
 
   // Redirect to the playlist route
-  res.redirect(`/playlist/${playlistId}#result-${trackId}`);
+  res.redirect(`/playlist/${playlistId}?track=${trackId}`);
 });
 
 /////////////////////////////////////////////
