@@ -1,0 +1,28 @@
+<div class="pagination">
+  <div class="pagination-page"><strong>Page:</strong></div>
+  <% if (currentPage > 1) { %>
+    <div class="pagination-page">
+      <a href="/playlist/<%=playlistId%>?page=<%=currentPage - 1%>">
+        &lt;&lt; Prev
+      </a>
+    </div>
+  <% } %>
+  <% for (let page = 1; page <= totalPages; page += 1) { %>
+    <div class="pagination-page">
+      <% if (page !== currentPage) { %>
+        <a href="/playlist/<%=playlistId%>?page=<%=page%>">
+      <% } %>
+          <%=page%>
+      <% if (page !== currentPage) { %>
+        </a>
+      <% } %>
+    </div>
+  <% } %>
+  <% if (currentPage < totalPages) { %>
+    <div class="pagination-page">
+      <a href="/playlist/<%=playlistId%>?page=<%=currentPage + 1%>">
+        Next &gt;&gt;
+      </a>
+    </div>
+  <% } %>
+</div>

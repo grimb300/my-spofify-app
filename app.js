@@ -164,6 +164,7 @@ app.get('/playlist', async (req, res) => {
 // View a playlist (single playlist) - "/playlist/:playlistId"
 app.get('/playlist/:playlistId', async (req, res) => {
   const playlistId = req.params.playlistId;
+  let currentPage = req.query.page;
 
   // Check that this playlist exists
   if (!req.session.googlePlaylists[playlistId]) {
@@ -175,14 +176,46 @@ app.get('/playlist/:playlistId', async (req, res) => {
   // Get the Google playlist
   const googlePlaylist = req.session.googlePlaylists[playlistId];
 
-  // Filter out the tracks that already have a spotifyTrack
-  // No need to search for them again
-  let searchTracks = googlePlaylist.googleTracks.filter(
-    (track) => !track.spotifyTrack
+  // Paginate the playlist tracks (25 tracks per page, for now)
+  const tracksPerPage = 25;
+  const totalPages = Math.ceil(
+    googlePlaylist.googleTracks.length / tracksPerPage
+  );
+  const lastPage = totalPages - 1;
+  // Do some input validation of the provided page
+  // First attempt to turn the query string into an integer
+  console.log(`Start, currentPage = ${currentPage}`);
+  currentPage = parseInt(currentPage);
+  console.log(`After parseInt, currentPage = ${currentPage}`);
+  // If NaN, default to page 0
+  if (isNaN(currentPage)) {
+    currentPage = 0;
+    console.log(`After isNaN, currentPage = ${currentPage}`);
+  } else {
+    console.log(`After isNaN, currentPage = ${currentPage}`);
+    // The page in the query string is 1 based
+    // change to 0 based page numbers for the rest of the function
+    currentPage = currentPage - 1;
+
+    // If page number is negative, default to page 0
+    currentPage = currentPage < 0 ? 0 : currentPage;
+    console.log(`After negative check, currentPage = ${currentPage}`);
+    // If greater than the last page, default to the last page
+    currentPage = currentPage > lastPage ? lastPage : currentPage;
+    console.log(`After overflow check, currentPage = ${currentPage}`);
+  }
+
+  // Get the track range to slice
+  const startPageTrack = currentPage * tracksPerPage;
+  const endPageTrack = startPageTrack + tracksPerPage;
+  const pageTracks = googlePlaylist.googleTracks.slice(
+    startPageTrack,
+    endPageTrack
   );
 
-  // Get current timestamp for perf reasons
-  const startTime = performance.now();
+  // Filter out the tracks that already have a spotifyTrack
+  // No need to search for them again
+  let searchTracks = pageTracks.filter((track) => !track.spotifyTrack);
 
   searchTracks = await Promise.all(
     searchTracks.map(async (track) => {
@@ -228,7 +261,11 @@ app.get('/playlist/:playlistId', async (req, res) => {
   res.render('playlist', {
     user: req.session.user,
     googlePlaylist: googlePlaylist,
-    playlistId: playlistId
+    playlistId: playlistId,
+    currentPage: currentPage + 1, // Go back to 1 based page numbers
+    totalPages: totalPages,
+    startPageTrackId: startPageTrack,
+    pageTracks: pageTracks
   });
 });
 

@@ -9,15 +9,16 @@
     </form>
   </div>
 </div>
+<%- include('./partials/pagination'); %>
 <div class="playlist-wrapper">
   <div class="playlist-row playlist-column-heading">
     <div class="column-heading">Track No.</div>
     <div class="column-heading">Google</div>
     <div class="column-heading">Spotify</div>
   </div>
-  <% googlePlaylist.googleTracks.forEach((googleTrack, trackId) => { %>
+  <% pageTracks.forEach((googleTrack, trackId) => { %>
     <div class="playlist-row playlist-entry" id="result-<%=trackId%>">
-      <div class="playlist-track-id"><%=trackId%></div>
+      <div class="playlist-track-id"><%=trackId + startPageTrackId%></div>
       <div class="playlist-track">
         <div class="track-heading">Title</div>
         <div class="track-data"><%=googleTrack.name%></div>
@@ -72,5 +73,6 @@
     </div>
   <% }) %>
 </div>
+<%- include('./partials/pagination'); %>
 
 <%- include('./partials/footer'); %>

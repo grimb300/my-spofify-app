@@ -210,3 +210,15 @@ header > h3 {
 .result-pick-button {
   grid-column: 4;
 }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+.pagination-page {
+  margin-left: 5px;
+  margin-right: 5px;
+}
