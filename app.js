@@ -600,6 +600,7 @@ app.post('/zipuploader', (req, res) => {
           let googleTracks = entries
             // Track CSVs all have different names, but live in the playlist directory
             .filter((entry) => entry.name.startsWith(playlist.directory))
+            .filter((entry) => entry.name.endsWith('.csv'))
             // Unzip the CSV file to a string
             .map((csv) => {
               return {
