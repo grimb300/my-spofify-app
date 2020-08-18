@@ -83,6 +83,25 @@ const generateRandomString = function (length) {
 const hasSpotifyTokens = (req, res, next) => {
   // Check for Spotify access tokens
   if (req.session.tokens) {
+    // Check to see when the tokens expire (convert milliseconds to minutes)
+    const timeLeft = Math.trunc(
+      (req.session.tokens.expiration - Date.now()) / 1000 / 60
+    );
+    console.log(`Access tokens will expire in ${timeLeft} minutes`);
+
+    // If less than some acceptable value, redirect to /refresh_token
+    // (being really conservative right now for testing purposes)
+    if (timeLeft < 59) {
+      console.log('Refreshing the access tokens for request');
+      console.log('Request original url');
+      console.log(req.originalUrl);
+      console.log('Request path');
+      console.log(req.path);
+      console.log('Request route');
+      console.log(req.route);
+      res.redirect(`/refresh_token?redirect=${req.originalUrl}`);
+      return;
+    }
     return next();
   }
   // Redirect to /login
@@ -739,10 +758,25 @@ app.get('/callback', (req, res) => {
     }
   })
     .then(async (response) => {
+      console.log('Auth flow, tokens returned');
+      console.log(response.data);
+      const currTimestamp = Date.now();
+      const currDateObj = new Date(currTimestamp);
+      console.log(`Current timestamp is: ${currTimestamp} (${currDateObj})`);
+      const expireTimestamp = currTimestamp + response.data.expires_in * 1000;
+      const expireDateObj = new Date(expireTimestamp);
+      console.log(
+        `Expiration timestamp is: ${expireTimestamp} (${expireDateObj})`
+      );
+
       // Add the tokens to the session data
       req.session.tokens = {
         access: response.data.access_token,
-        refresh: response.data.refresh_token
+        refresh: response.data.refresh_token,
+        // expires_in is number of seconds until expiration
+        // Date.now() returns the current timestamp in milliseconds
+        // going to keep expiration in milliseconds to make things simpler
+        expiration: response.data.expires_in * 1000 + Date.now()
       };
 
       // Get the user data
@@ -769,29 +803,84 @@ app.get('/user', (req, res) => {
 // Refresh Token route, from Spotify example code
 app.get('/refresh_token', (req, res) => {
   // requesting access token from refresh token
-  var refresh_token = req.query.refresh_token;
-  var authOptions = {
+  const refresh_token = req.session.tokens.refresh;
+  const redirect = req.query.redirect;
+
+  axios({
     url: 'https://accounts.spotify.com/api/token',
-    headers: {
-      Authorization:
-        'Basic ' +
-        new Buffer(client_id + ':' + client_secret).toString('base64')
-    },
-    form: {
+    method: 'post',
+    params: {
       grant_type: 'refresh_token',
       refresh_token: refresh_token
     },
-    json: true
-  };
-
-  request.post(authOptions, function (error, response, body) {
-    if (!error && response.statusCode === 200) {
-      var access_token = body.access_token;
-      res.send({
-        access_token: access_token
-      });
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    auth: {
+      username: client_id,
+      password: client_secret
     }
-  });
+  })
+    .then(async (response) => {
+      console.log('Refresh flow, tokens returned');
+      console.log(response.data);
+      const currTimestamp = Date.now();
+      const currDateObj = new Date(currTimestamp);
+      console.log(`Current timestamp is: ${currTimestamp} (${currDateObj})`);
+      const expireTimestamp = currTimestamp + response.data.expires_in * 1000;
+      const expireDateObj = new Date(expireTimestamp);
+      console.log(
+        `Expiration timestamp is: ${expireTimestamp} (${expireDateObj})`
+      );
+
+      // Update the access token and expiration to the session data
+      req.session.tokens.access = response.data.access_token;
+      req.session.tokens.expiration =
+        response.data.expires_in * 1000 + Date.now();
+
+      console.log(`The redirect path given: ${redirect}`);
+
+      // If a redirect path was given...
+      if (redirect) {
+        console.log('A redirect path was given');
+        // ... clean it up a bit since redirecting to a non get route doesn't work for me
+        // I want to turn the path into one of the following:
+        let redirectPath = '/';
+        //   "/playlist/:playlistId/track/:trackId"
+        let trackMatch = redirect.match(/^(\/playlist\/[0-9]+\/track\/[0-9]+)/);
+        //   "/playlist/:playlistId"
+        let playlistMatch = redirect.match(/^(\/playlist\/[0-9]+)/);
+        //   "/playlist"
+        let libraryMatch = redirect.match(/^(\/playlist)/);
+        if (trackMatch) {
+          console.log('Matched a track route');
+          console.log(trackMatch);
+          redirectPath = trackMatch[1];
+        } else if (playlistMatch) {
+          console.log('Matched a playlist route');
+          console.log(playlistMatch);
+          redirectPath = playlistMatch[1];
+        } else if (libraryMatch) {
+          console.log('Matched a library route');
+          console.log(libraryMatch);
+          redirectPath = libraryMatch[1];
+        } else {
+          console.log('No match, redirect to root');
+          redirectPath = '/';
+        }
+
+        // ... redirect there
+        res.redirect(redirectPath);
+      } else {
+        console.log('What is a redirect path');
+        // ... else, redirect to the root
+        res.redirect('/');
+      }
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 });
 
 app.listen(port, () =>
