@@ -87,18 +87,10 @@ const hasSpotifyTokens = (req, res, next) => {
     const timeLeft = Math.trunc(
       (req.session.tokens.expiration - Date.now()) / 1000 / 60
     );
-    console.log(`Access tokens will expire in ${timeLeft} minutes`);
 
     // If less than some acceptable value, redirect to /refresh_token
-    // (being really conservative right now for testing purposes)
-    if (timeLeft < 59) {
-      console.log('Refreshing the access tokens for request');
-      console.log('Request original url');
-      console.log(req.originalUrl);
-      console.log('Request path');
-      console.log(req.path);
-      console.log('Request route');
-      console.log(req.route);
+    // (being a bit conservative with refreshing when the token has less than 5 minutes left)
+    if (timeLeft < 5) {
       res.redirect(`/refresh_token?redirect=${req.originalUrl}`);
       return;
     }
@@ -758,17 +750,6 @@ app.get('/callback', (req, res) => {
     }
   })
     .then(async (response) => {
-      console.log('Auth flow, tokens returned');
-      console.log(response.data);
-      const currTimestamp = Date.now();
-      const currDateObj = new Date(currTimestamp);
-      console.log(`Current timestamp is: ${currTimestamp} (${currDateObj})`);
-      const expireTimestamp = currTimestamp + response.data.expires_in * 1000;
-      const expireDateObj = new Date(expireTimestamp);
-      console.log(
-        `Expiration timestamp is: ${expireTimestamp} (${expireDateObj})`
-      );
-
       // Add the tokens to the session data
       req.session.tokens = {
         access: response.data.access_token,
@@ -823,27 +804,13 @@ app.get('/refresh_token', (req, res) => {
     }
   })
     .then(async (response) => {
-      console.log('Refresh flow, tokens returned');
-      console.log(response.data);
-      const currTimestamp = Date.now();
-      const currDateObj = new Date(currTimestamp);
-      console.log(`Current timestamp is: ${currTimestamp} (${currDateObj})`);
-      const expireTimestamp = currTimestamp + response.data.expires_in * 1000;
-      const expireDateObj = new Date(expireTimestamp);
-      console.log(
-        `Expiration timestamp is: ${expireTimestamp} (${expireDateObj})`
-      );
-
       // Update the access token and expiration to the session data
       req.session.tokens.access = response.data.access_token;
       req.session.tokens.expiration =
         response.data.expires_in * 1000 + Date.now();
 
-      console.log(`The redirect path given: ${redirect}`);
-
       // If a redirect path was given...
       if (redirect) {
-        console.log('A redirect path was given');
         // ... clean it up a bit since redirecting to a non get route doesn't work for me
         // I want to turn the path into one of the following:
         let redirectPath = '/';
@@ -854,26 +821,18 @@ app.get('/refresh_token', (req, res) => {
         //   "/playlist"
         let libraryMatch = redirect.match(/^(\/playlist)/);
         if (trackMatch) {
-          console.log('Matched a track route');
-          console.log(trackMatch);
           redirectPath = trackMatch[1];
         } else if (playlistMatch) {
-          console.log('Matched a playlist route');
-          console.log(playlistMatch);
           redirectPath = playlistMatch[1];
         } else if (libraryMatch) {
-          console.log('Matched a library route');
-          console.log(libraryMatch);
           redirectPath = libraryMatch[1];
         } else {
-          console.log('No match, redirect to root');
           redirectPath = '/';
         }
 
         // ... redirect there
         res.redirect(redirectPath);
       } else {
-        console.log('What is a redirect path');
         // ... else, redirect to the root
         res.redirect('/');
       }
