@@ -540,10 +540,12 @@ app.post('/zipuploader', (req, res) => {
     ) {
       errorMsg =
         'Bad filename, please choose a Google Takeout zip file ("takeout-*.zip") to upload';
-    } else if (files.filetoupload.type !== 'application/x-zip-compressed') {
-      errorMsg =
-        'Bad filetype, please choose a Google Takeout zip file to upload';
     }
+    // FIXME: Checking the MIME type of the file seems like a good idea, but doesn't work in practice. Fix this?
+    // else if (files.filetoupload.type !== 'application/x-zip-compressed') {
+    //   errorMsg =
+    //     'Bad filetype, please choose a Google Takeout zip file to upload';
+    // }
     if (errorMsg) {
       // If not, render zipuploader again with an error message
       res.render('zipuploader', {
@@ -558,7 +560,13 @@ app.post('/zipuploader', (req, res) => {
       file: files.filetoupload.path,
       storeEntries: true
     });
-    zip.on('error', (err) => console.error(err));
+    zip.on('error', (err) => {
+      console.error(err);
+      res.render('error', {
+        error: err
+      });
+      return;
+    });
     zip.on('ready', () => {
       // Array of all files in the zip archive
       const entries = Object.values(zip.entries());
