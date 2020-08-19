@@ -563,16 +563,29 @@ app.post('/zipuploader', (req, res) => {
     zip.on('error', (err) => {
       console.error(err);
       res.render('error', {
+        user: req.session.user,
         error: err
       });
       return;
     });
     zip.on('ready', () => {
-      // Array of all files in the zip archive
-      const entries = Object.values(zip.entries());
+      // Array of all CSV files in the zip archive
+      const csvFiles = Object.values(zip.entries())
+        // Filter out the __MACOSX directory (thank you zip archives created on Mac OS X)
+        .filter((entry) => !entry.name.startsWith('__MACOSX'))
+        // Return only *.csv files
+        .filter((entry) => entry.name.endsWith('.csv'));
+
+      // Get the root of the "Google Play Music" archive, use the first entry in the array
+      const googlePlayMusicDir = csvFiles[0].name.replace(
+        /^(.*\/Google Play Music).*$/,
+        '$1'
+      );
 
       // Parse the playlist CSVs
-      let googlePlaylists = entries
+      let googlePlaylists = csvFiles
+        // // Filter out the __MACOSX directory that got created by Fara's computer
+        // .filter((entry) => !entry.name.startsWith('__MACOSX'))
         // Playlist CSVs are all the same filename (different directories, of course)
         .filter((entry) => entry.name.endsWith('Metadata.csv'))
         // Unzip the CSV file to a string
@@ -597,14 +610,14 @@ app.post('/zipuploader', (req, res) => {
       // There are two directories with tracks that don't follow the above paradigm, add them manually here
       googlePlaylists.push(
         {
-          directory: 'Takeout/Google Play Music/Playlists/Thumbs Up',
+          directory: `${googlePlayMusicDir}/Playlists/Thumbs Up`,
           parsed: {
             Title: 'Google Music - Thumbs Up',
             Description: 'Tracks which were given a Thumbs Up in Google Music'
           }
         },
         {
-          directory: 'Takeout/Google Play Music/Tracks',
+          directory: `${googlePlayMusicDir}/Tracks`,
           parsed: {
             Title: 'Google Music - Tracks',
             Description: 'Tracks from the Google Music library'
@@ -616,7 +629,7 @@ app.post('/zipuploader', (req, res) => {
       googlePlaylists = googlePlaylists
         .map((playlist) => {
           // Parse the playlist CSVs for this playlist
-          let googleTracks = entries
+          let googleTracks = csvFiles
             // Track CSVs all have different names, but live in the playlist directory
             .filter((entry) => entry.name.startsWith(playlist.directory))
             .filter((entry) => entry.name.endsWith('.csv'))
