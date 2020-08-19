@@ -12,5 +12,7 @@
   <header>
     <h1>My Playlist Converter App</h1>
     <h3>Howdy, <%=user.display_name%>!</h3>
-    <div class="profile-pic"><img width="30" src="<%=user.images[0].url%>" alt="Profile picture" /></div>
+    <% if (user.images[0]) { %>
+      <div class="profile-pic"><img width="30" src="<%=user.images[0].url%>" alt="Profile picture" /></div>
+    <% } %>
   </header>
