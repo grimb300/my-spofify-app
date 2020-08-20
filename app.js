@@ -132,10 +132,20 @@ app.get('/', (req, res) => {
 // View the library (all playlists) - "/playlist"
 app.get('/playlist', async (req, res) => {
   // Get the user's Spotify playlists
-  const spotifyPlaylists = await getSpotifyData(
-    'https://api.spotify.com/v1/me/playlists',
-    req.session.tokens
-  );
+  let spotifyPlaylists = [];
+
+  // Make playlist requests until there are no more playlists to request
+  // By default, the Spotify playlists endpoint will return 20 playlists
+  // The next field in the return data contains the URL for the next batch to request
+  let playlistsUrl = 'https://api.spotify.com/v1/me/playlists';
+  while (playlistsUrl) {
+    const playlistsData = await getSpotifyData(
+      playlistsUrl,
+      req.session.tokens
+    );
+    spotifyPlaylists = spotifyPlaylists.concat(playlistsData.items);
+    playlistsUrl = playlistsData.next;
+  }
 
   // Map the Spotify playlists onto the Google playlists
   req.session.googlePlaylists = req.session.googlePlaylists.map(
@@ -145,7 +155,7 @@ app.get('/playlist', async (req, res) => {
       // If there is already a spotifyPlaylist associated with this googlePlaylist
       if (googlePlaylist.spotifyPlaylist) {
         // Find the matching playlist based on Spotify playlist ID
-        updatedSpotifyPlaylist = spotifyPlaylists.items.find(
+        updatedSpotifyPlaylist = spotifyPlaylists.find(
           (spotifyPlaylist) =>
             googlePlaylist.spotifyPlaylist.id === spotifyPlaylist.id
         );
@@ -154,7 +164,7 @@ app.get('/playlist', async (req, res) => {
       // If the updated Spotify playlist is still undefined
       if (!updatedSpotifyPlaylist) {
         // Find the matching playlist based on the playlist name
-        updatedSpotifyPlaylist = spotifyPlaylists.items.find(
+        updatedSpotifyPlaylist = spotifyPlaylists.find(
           (spotifyPlaylist) => googlePlaylist.name === spotifyPlaylist.name
         );
       }
