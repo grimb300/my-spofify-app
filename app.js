@@ -254,27 +254,25 @@ app.get('/playlist/:playlistId', async (req, res) => {
 
   searchTracks = await Promise.all(
     searchTracks.map(async (track) => {
-      // Search Spotify based on the Google track info
-      const searchString = `track:${track.name} artist:${track.artist} album:${track.album}`;
-      const searchResults = await getSpotifyData(
-        'https://api.spotify.com/v1/search',
-        req.session.tokens,
+      const searchResults = await spotifySearch(
         {
-          q: searchString,
-          type: 'track'
-        }
+          track: track.name,
+          artist: track.artist,
+          album: track.album
+        },
+        req.session.tokens
       );
 
       // Check the results
-      if (searchResults.tracks.total === 0) {
+      if (searchResults.length === 0) {
         // If no results, set spotifyTrack to false (so it is definitely falsey)
         track.spotifyTrack = false;
-      } else if (searchResults.tracks.total === 1) {
+      } else if (searchResults.length === 1) {
         // If only one is returned, the choice is obvious
-        track.spotifyTrack = searchResults.tracks.items[0];
+        track.spotifyTrack = searchResults[0];
       } else {
         // Find the best fit
-        const bestFit = searchResults.tracks.items.find(
+        const bestFit = searchResults.find(
           (spotifyTrack) =>
             spotifyTrack.name === track.name &&
             spotifyTrack.artists.includes(track.artist) &&
@@ -286,7 +284,7 @@ app.get('/playlist/:playlistId', async (req, res) => {
           track.spotifyTrack = bestFit;
         } else {
           // Otherwise punt and take the first one in the list
-          track.spotifyTrack = searchResults.tracks.items[0];
+          track.spotifyTrack = searchResults[0];
         }
       }
     })
@@ -427,30 +425,20 @@ app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
     req.session.googlePlaylists[playlistId].googleTracks[trackId];
 
   // Create a search based on terms provided in the query
-  // If no query, default to a search based on the Google track info
-  const searchTerms = req.query.search
-    ? req.query.search
-    : {
-        track: googleTrack.name,
-        artist: googleTrack.artist,
-        album: googleTrack.album
-      };
-  const searchString = [
-    searchTerms.track ? `track:${searchTerms.track}` : '',
-    searchTerms.artist ? `artist:${searchTerms.artist}` : '',
-    searchTerms.album ? `album:${searchTerms.album}` : ''
-  ]
-    .filter((term) => term !== '')
-    .join(' ');
+  // If no query or empty query, default to a search based on the Google track info
+  const searchTerms =
+    req.query.search &&
+    (req.query.search.track ||
+      req.query.search.artist ||
+      req.query.search.album)
+      ? req.query.search
+      : {
+          track: googleTrack.name,
+          artist: googleTrack.artist,
+          album: googleTrack.album
+        };
 
-  const searchResults = await getSpotifyData(
-    'https://api.spotify.com/v1/search',
-    req.session.tokens,
-    {
-      q: searchString,
-      type: 'track'
-    }
-  );
+  const searchResults = await spotifySearch(searchTerms, req.session.tokens);
 
   // Render track.ejs
   res.render('track', {
@@ -459,7 +447,7 @@ app.get('/playlist/:playlistId/track/:trackId', async (req, res) => {
     playlistId: playlistId,
     trackId: trackId,
     searchTerms: searchTerms,
-    searchResults: searchResults.tracks.items
+    searchResults: searchResults
   });
 });
 
@@ -970,4 +958,45 @@ const cleanHtmlFunc = (match, p1, p2, p3) => {
   }
   console.log(`ERROR: Don't know how to clean up ${match}`);
   return match;
+};
+
+// Common search function
+// Input (searchTerms) is an object with possible fields: track, artist, album
+const spotifySearch = async (searchTerms, spotifyTokens) => {
+  // Handle special characters in the search terms
+  const specialCharsRegex = /'/g;
+  // Track names sometimes have a featured artist parenthetical
+  const featuringRegex = /\(.*feat.*\)/g;
+  // Albums sometimes have a special release parenthetical
+  const specialReleaseRegex = /\(.*deluxe.*\)/gi;
+  // Clean up the search terms a bit
+  const searchTrack = searchTerms.track
+    .replace(specialCharsRegex, '')
+    .replace(featuringRegex, '');
+  const searchArtist = searchTerms.artist.replace(specialCharsRegex, '');
+  const searchAlbum = searchTerms.album
+    .replace(specialCharsRegex, '')
+    .replace(specialReleaseRegex, '');
+
+  // Create the search string
+  const searchString = [
+    searchTrack ? `track:${searchTrack}` : '',
+    searchArtist ? `artist:${searchArtist}` : '',
+    searchAlbum ? `album:${searchAlbum}` : ''
+  ]
+    .filter((term) => term !== '')
+    .join(' ');
+
+  // Get the results
+  const searchResults = await getSpotifyData(
+    'https://api.spotify.com/v1/search',
+    spotifyTokens,
+    {
+      q: searchString,
+      type: 'track'
+    }
+  );
+
+  // Return the results
+  return searchResults.tracks.items;
 };
