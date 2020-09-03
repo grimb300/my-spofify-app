@@ -706,14 +706,15 @@ app.post('/zipuploader', (req, res) => {
 
 // Login route, borrowed from the Spotify example code
 app.get('/login', (req, res) => {
-  console.log(
-    `/login route called with host of ${req.protocol}://${req.hostname}:${port}`
-  );
   const state = generateRandomString(16);
   req.session[stateKey] = state;
 
-  // Building the redirect_uri from scratch to make it less reliant on .env
-  const new_redirect_uri = `${req.protocol}://${req.hostname}:${port}/callback`;
+  // If .env doesn't contain SPOTIFY_REDIRECT_URI, build it from scratch using info from the request
+  if (!redirect_uri) {
+    // Assume https
+    redirect_uri = `https://${req.hostname}:${port}/callback`;
+  }
+  console.log(`Redirecting to ${redirect_uri}`);
 
   // your application requests authorization
   const scope = [
@@ -730,7 +731,7 @@ app.get('/login', (req, res) => {
         response_type: 'code',
         client_id: client_id,
         scope: scope,
-        redirect_uri: new_redirect_uri,
+        redirect_uri: redirect_uri,
         state: state
       })
   );
