@@ -59,7 +59,18 @@ app.set('view engine', 'ejs');
 // Replace the client_secret before productizing
 const client_id = process.env.SPOTIFY_CLIENT_ID; // Your client id
 const client_secret = process.env.SPOTIFY_CLIENT_SECRET; // Your secret
-let redirect_uri = process.env.SPOTIFY_REDIRECT_URI; // Your redirect uri
+// Dynamically generate the redirect URI
+const gen_redirect_uri = (req) => {
+  // Base case, if there is an env variable, use that
+  console.log(`SPOTIFY_REDIRECT_URI = ${process.env.SPOTIFY_REDIRECT_URI}`);
+  if (process.env.SPOTIFY_REDIRECT_URI) return process.env.SPOTIFY_REDIRECT_URI; // Your redirect uri
+
+  // If not, build it dynamically based on the request
+  // Assume https and assume no port due to using a proxy (this prove to ba a bad assumption later on)
+  redirect_uri = `https://${req.hostname}/callback`;
+  console.log(`Redirecting to ${redirect_uri}`);
+  return redirect_uri;
+};
 
 // Helper function from Spotify example code
 /**
@@ -709,13 +720,6 @@ app.get('/login', (req, res) => {
   const state = generateRandomString(16);
   req.session[stateKey] = state;
 
-  // If .env doesn't contain SPOTIFY_REDIRECT_URI, build it from scratch using info from the request
-  if (!redirect_uri) {
-    // Assume https and assume no port due to using a proxy (this prove to ba a bad assumption later on)
-    redirect_uri = `https://${req.hostname}/callback`;
-  }
-  console.log(`Redirecting to ${redirect_uri}`);
-
   // your application requests authorization
   const scope = [
     'user-read-private',
@@ -731,7 +735,7 @@ app.get('/login', (req, res) => {
         response_type: 'code',
         client_id: client_id,
         scope: scope,
-        redirect_uri: redirect_uri,
+        redirect_uri: gen_redirect_uri(req),
         state: state
       })
   );
@@ -763,7 +767,7 @@ app.get('/callback', (req, res) => {
     method: 'post',
     params: {
       code: code,
-      redirect_uri: redirect_uri,
+      redirect_uri: gen_redirect_uri(req),
       grant_type: 'authorization_code'
     },
     headers: {
