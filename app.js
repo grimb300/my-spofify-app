@@ -711,8 +711,8 @@ app.get('/login', (req, res) => {
 
   // If .env doesn't contain SPOTIFY_REDIRECT_URI, build it from scratch using info from the request
   if (!redirect_uri) {
-    // Assume https
-    redirect_uri = `https://${req.hostname}:${port}/callback`;
+    // Assume https and assume no port due to using a proxy (this prove to ba a bad assumption later on)
+    redirect_uri = `https://${req.hostname}/callback`;
   }
   console.log(`Redirecting to ${redirect_uri}`);
 
